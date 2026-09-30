@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#061b22">
 <meta name="description" content="Fivefold: a themed five-in-a-row card board game. Play the computer, pass and play, or online with friends.">
 <title>Fivefold</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -58,7 +59,8 @@
 }
 
 [hidden] { display: none !important; }
-html, body { height: 100%; }
+html, body { height: 100%; touch-action: manipulation; -webkit-text-size-adjust: 100%; }
+button, .cell, .hcard { -webkit-tap-highlight-color: transparent; }
 img { max-width: 100%; }
 body { margin: 0; background: var(--scene), var(--bg); background-attachment: fixed; color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
 body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .5; mix-blend-mode: overlay;
@@ -76,7 +78,7 @@ button { cursor: pointer; }
 .bar-right { display: flex; align-items: center; gap: 8px; }
 .skins { display: flex; gap: 6px; padding: 4px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); }
 .skin-dot { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; padding: 0; background: var(--sw); box-shadow: inset 0 0 0 2px rgba(0,0,0,.25); transition: transform .15s; }
-.skin-dot:hover { transform: scale(1.08); }
+@media (hover: hover) { .skin-dot:hover { transform: scale(1.08); } }
 .skin-dot[aria-pressed="true"] { border-color: var(--accent-hi); }
 .skin-dot[data-k="pirate"] { --sw: conic-gradient(#b8281f 0 33%, #0b3440 0 66%, #d9a441 0); }
 .skin-dot[data-k="casino"] { --sw: conic-gradient(#c41e3a 0 33%, #15724e 0 66%, #e8cd78 0); }
@@ -89,7 +91,7 @@ button { cursor: pointer; }
 
 /* ---------- buttons & inputs ---------- */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; border-radius: 10px; padding: 10px 16px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); transition: transform .12s, background .2s, box-shadow .2s; }
-.btn:hover { background: rgba(255,255,255,.08); }
+@media (hover: hover) { .btn:hover { background: rgba(255,255,255,.08); } }
 .btn:active { transform: translateY(1px); }
 .btn.primary { background: linear-gradient(180deg, var(--accent-hi), var(--accent)); color: var(--accent-ink); border-color: transparent; box-shadow: 0 6px 18px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.45); letter-spacing: .02em; }
 .btn.primary:hover { filter: brightness(1.06); }
@@ -118,7 +120,7 @@ button { cursor: pointer; }
 @media (max-width: 520px) { .fan .chip-demo { display: none; } }
 .themes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .theme-tile { text-align: left; border-radius: 14px; padding: 10px; border: 1px solid var(--line); background: var(--scene), var(--bg); color: var(--ink); display: grid; gap: 8px; min-width: 0; transition: transform .15s, border-color .2s; }
-.theme-tile:hover { transform: translateY(-2px); }
+@media (hover: hover) { .theme-tile:hover { transform: translateY(-2px); } }
 .theme-tile[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
 .theme-tile .tt-name { font-family: var(--font-display); font-size: 17px; color: var(--accent); letter-spacing: var(--display-track); line-height: 1.1; }
 .theme-tile .tt-row { display: flex; align-items: center; gap: 4px; }
@@ -213,13 +215,18 @@ button { cursor: pointer; }
 .plaque.bl { bottom: calc(var(--cell) * .28); left: calc(var(--cell) * .45); }
 .plaque.br { bottom: calc(var(--cell) * .28); right: calc(var(--cell) * .45); }
 .frame.small .plaque { display: none; }
+.frame.small { padding: calc(var(--cell) * .55) calc(var(--cell) * .35); }
+.frame.small .engrave { font-size: calc(var(--cell) * .3); }
+.frame.small .engrave.top { top: calc(var(--cell) * .1); }
+.frame.small .engrave.bottom { bottom: calc(var(--cell) * .1); }
+.btn.danger { border-color: rgba(230,90,80,.5); color: #ffb4a8; }
 
 .cell { position: relative; width: var(--cell); height: calc(var(--cell) * 1.22); --w: var(--cell); border-radius: calc(var(--cell) * .09); transition: filter .25s, transform .2s; }
 .grid.selecting .cell:not(.target):not(.rtarget) { filter: brightness(.5) saturate(.6); }
 .cell.peek .cf { box-shadow: inset 0 0 0 2px var(--accent), 0 0 12px var(--accent); }
 .cell.target { cursor: pointer; z-index: 2; }
 .cell.target .cf { box-shadow: inset 0 0 0 2px var(--accent-hi), 0 0 0 2px rgba(0,0,0,.4), 0 0 18px var(--accent); animation: glow 1.4s ease-in-out infinite; }
-.cell.target:hover { transform: translateY(-2px) scale(1.04); }
+@media (hover: hover) { .cell.target:hover { transform: translateY(-2px) scale(1.04); } }
 .cell.rtarget { cursor: pointer; z-index: 2; }
 .cell.rtarget .chip { animation: wobble 1s ease-in-out infinite; box-shadow: 0 0 0 3px #fff, 0 0 18px 4px rgba(255,60,60,.8); }
 @keyframes glow { 50% { box-shadow: inset 0 0 0 2px var(--accent-hi), 0 0 0 2px rgba(0,0,0,.4), 0 0 26px 4px var(--accent); } }
@@ -268,7 +275,7 @@ button { cursor: pointer; }
 .hand { display: flex; justify-content: center; min-height: calc(var(--w) * 1.4 + 6px); padding-top: 14px; --w: 72px; }
 .hcard { position: relative; width: var(--w); height: calc(var(--w) * 1.4); flex: none; margin-left: calc(var(--overlap, 0px) * -1); border: 0; padding: 0; background: none; border-radius: calc(var(--w) * .09); transition: transform .22s cubic-bezier(.2,.8,.2,1), filter .2s; transform: rotate(var(--rot, 0deg)) translateY(var(--dy, 0px)); filter: drop-shadow(0 6px 10px rgba(0,0,0,.45)); }
 .hcard:first-child { margin-left: 0; }
-.hcard:hover { --dy: -8px; z-index: 3; }
+@media (hover: hover) { .hcard:hover { --dy: -8px; z-index: 3; } }
 .hcard.sel { --dy: -18px; z-index: 4; }
 .hcard.sel .cf { box-shadow: inset 0 0 0 2px var(--accent-hi), 0 0 0 3px var(--accent), 0 0 20px var(--accent); }
 .hcard .badge { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); white-space: nowrap; z-index: 2; }
@@ -332,6 +339,38 @@ button { cursor: pointer; }
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 70; background: var(--panel); border: 1px solid var(--line); padding: 10px 16px; border-radius: 12px; box-shadow: 0 12px 30px rgba(0,0,0,.5); max-width: calc(100% - 32px); box-sizing: border-box; animation: fade .2s; }
 .toast[hidden] { display: none; }
 canvas.fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 65; }
+/* ---------- phones ---------- */
+@media (max-width: 959px) {
+  body { background-attachment: scroll; }
+  body::before { display: none; }
+  .panel, .play-card { backdrop-filter: none; }
+  .game { padding-bottom: calc(var(--dock, 160px) + 14px); gap: 10px; }
+  .hand-box { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; border-radius: 16px 16px 0 0; border-bottom: 0; background: var(--bg); box-shadow: 0 -10px 30px rgba(0,0,0,.5); padding: 6px 12px calc(8px + env(safe-area-inset-bottom, 0px)); gap: 6px; }
+  .hb-head { display: none; }
+  .hand { padding-top: 10px; min-height: calc(var(--w) * 1.4 + 2px); }
+  .hcard .badge { font-size: 8px; padding: 1px 5px; top: -7px; }
+  .hcard.sel { --dy: -12px; }
+  .actions { min-height: 36px; }
+  .actions .btn { padding: 8px 14px; }
+  .actions .btn.big { padding: 10px 18px; font-size: 15px; }
+  .actions .hint { font-size: 12.5px; }
+  .status { padding: 8px 12px; gap: 10px; }
+  .status .t1l { font-size: 19px; }
+  .status .who, .status .who .chip { width: 26px; height: 26px; }
+  .toast { bottom: calc(var(--dock, 160px) + 12px); }
+}
+@media (max-width: 520px) {
+  .topbar { flex-wrap: nowrap; gap: 8px; padding-block: 8px; }
+  .brand { gap: 6px; }
+  .brand-mark { width: 24px; height: 24px; }
+  .brand-name { font-size: 21px; }
+  .bar-right { gap: 6px; }
+  .skins { gap: 4px; padding: 3px; }
+  .skin-dot { width: 24px; height: 24px; }
+  .icon-btn { width: 34px; height: 34px; }
+  .modal { padding: 20px; }
+  .modal h2 { font-size: 30px; }
+}
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 </style>
 
@@ -483,7 +522,7 @@ canvas.fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events
       <div class="pile" id="pile"></div>
       <span class="label" id="logLabel">Captain's log</span>
       <ol class="log" id="log"></ol>
-      <div class="game-foot"><button class="btn" id="btnMenu">Main menu</button><button class="btn" id="btnRestart">New game</button></div>
+      <div class="game-foot"><button class="btn" id="btnMenu">Main menu</button><button class="btn" id="btnRestart">New game</button><button class="btn danger" id="btnEnd">End game</button></div>
     </div>
   </main>
 </div>
@@ -509,6 +548,7 @@ canvas.fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events
       <li><b>First to 2 sequences:</b> two teams need two sequences, three teams need one. First to get there wins.</li>
       <li><b>Full board:</b> keep playing until the board is full or the cards run out. The team with the most sequences wins. If that's tied, the team with more chips on the board wins.</li>
       <li>Your two sequences may share one chip.</li>
+      <li><b>End game</b> stops the game at any time (online, only the host can). The team with the most sequences wins, then the most chips on the board.</li>
     </ul>
     <button class="btn primary" id="rulesClose">Got it</button>
   </div>
@@ -695,6 +735,15 @@ const Engine = (() => {
     s.moveNo++;
     return s;
   }
+  // The host (or anyone, in local games) can stop the game; it is scored like a full-board finish.
+  function endNow(s0, pi) {
+    const s = clone(s0);
+    if (s.winner !== -1) throw new Error('Game is over');
+    pushLog(s, { pi, kind: 'end', n: s.moveNo });
+    finish(s, 'ended');
+    s.moveNo++;
+    return s;
+  }
   function pass(s0, pi) {
     const s = clone(s0);
     if (s.turn !== pi) throw new Error('Not your turn');
@@ -769,7 +818,7 @@ const Engine = (() => {
 
   return {
     LAYOUT, CORNER, POS, rankOf, suitOf, isJack, isTwoEyed, isOneEyed,
-    create, targets, isDead, hasMove, canSwap, openSquares, chipCount, play, swapDead, pass, aiChoose, aiApply, teamsFor, handSize
+    create, targets, isDead, hasMove, canSwap, openSquares, chipCount, endNow, play, swapDead, pass, aiChoose, aiApply, teamsFor, handSize
   };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;
@@ -936,6 +985,7 @@ let prevHandKey = '';
 const grid = $('#grid');
 let cells = [], renderedKey = [];
 
+const phone = () => !matchMedia('(min-width: 960px)').matches;
 const myTeam = () => G.players[viewSeat] ? G.players[viewSeat].team : -1;
 const myHand = () => (G && G.hands[viewSeat]) || [];
 function canActNow() {
@@ -954,10 +1004,17 @@ function buildBoard() {
 function sizeBoard() {
   const area = $('#boardArea'), frame = $('#frame');
   if (!area || $('#game').hidden) return;
-  const desktop = matchMedia('(min-width: 960px)').matches;
   const aw = area.clientWidth;
-  const ah = desktop ? innerHeight - area.getBoundingClientRect().top - 24 : innerHeight * 0.95;
-  const cw = Math.max(24, Math.floor(Math.min(aw / 11.5, ah / 14.7)));
+  let cw;
+  if (!phone()) cw = Math.floor(Math.min(aw / 11.5, (innerHeight - area.getBoundingClientRect().top - 24) / 14.7));
+  else {
+    // phones: fill the width, but shrink a little if that keeps the whole board above the card dock
+    const dock = document.querySelector('.hand-box').offsetHeight || 160;
+    const room = innerHeight - (area.getBoundingClientRect().top + scrollY) - dock - 12;
+    const byW = aw / 11.5, byH = room / 14;
+    cw = Math.floor(byH >= byW * 0.74 ? Math.min(byW, byH) : byW);
+  }
+  cw = Math.max(24, cw);
   document.documentElement.style.setProperty('--cell', cw + 'px');
   grid.classList.toggle('compact', cw < 50);
   frame.classList.toggle('small', cw < 42);
@@ -1063,6 +1120,7 @@ function renderLog() {
     if (e.kind === 'place') txt = `${n} played ${tagHTML(e.card)}${e.seq ? ' and completed a sequence' : ''}`;
     else if (e.kind === 'remove') txt = `${n} used ${tagHTML(e.card)} to knock off a ${esc(teamName(e.victim))} chip`;
     else if (e.kind === 'swap') txt = `${n} swapped a dead ${tagHTML(e.card)}`;
+    else if (e.kind === 'end') txt = `${n} ended the game`;
     else txt = `${n} had no move`;
     return `<li><span class="ld" style="background:var(--t${p.team})"></span><span>${txt}</span></li>`;
   }).join('') || '<li class="note">No moves yet.</li>';
@@ -1073,7 +1131,7 @@ function renderHand(fresh) {
   el.classList.toggle('hidden', !handVisible);
   const n = hand.length;
   const avail = el.clientWidth || 320;
-  const w = Math.min(76, Math.max(48, avail / Math.max(4.2, n * 0.82)));
+  const w = Math.min(phone() ? 50 : 76, Math.max(44, avail / Math.max(4.2, n * 0.82)));
   el.style.setProperty('--w', w + 'px');
   const overlap = n > 1 ? Math.max(0, (n * w - avail + 8) / (n - 1)) : 0;
   el.style.setProperty('--overlap', overlap + 'px');
@@ -1122,7 +1180,9 @@ function renderActions() {
 function renderAll(newMove, fresh) {
   renderBoard(newMove); renderHand(fresh); renderActions(); renderStatus(); renderTeams(); renderPile(); renderLog();
   $('#logLabel') && ($('#logLabel').textContent = SKINS[skin].log);
-  $('#btnRestart').hidden = mode === 'online' && !(onlineDoc && onlineDoc.host === myId);
+  const isHost = mode !== 'online' || (onlineDoc && onlineDoc.host === myId);
+  $('#btnRestart').hidden = !isHost;
+  $('#btnEnd').hidden = !isHost || !G || G.winner !== -1;
 }
 
 /* ---------------- flow ---------------- */
@@ -1215,8 +1275,9 @@ function showVictory() {
   victoryFor = G.gid;
   const w = G.winner;
   let title, sub, rec = '';
-  const full = G.rule === 'full';
-  const why = { board: 'The board is full.', cards: 'All the cards have been played.', stuck: 'Nobody can make another move.' }[G.endReason] || '';
+  const full = G.rule === 'full' || G.endReason === 'ended';
+  const ender = G.log.find(e => e.kind === 'end');
+  const why = { board: 'The board is full.', cards: 'All the cards have been played.', stuck: 'Nobody can make another move.', ended: `${ender && G.players[ender.pi] ? G.players[ender.pi].name : 'The host'} ended the game.` }[G.endReason] || '';
   if (w === -2) { title = 'Stalemate'; sub = 'Every square that matters is taken and nobody can move.'; }
   else if (w === -3) { title = 'Tied game'; sub = `${why} Same number of sequences and chips on the board.`; }
   else {
@@ -1224,9 +1285,9 @@ function showVictory() {
     const mine = mode !== 'local' && G.players[viewSeat] && G.players[viewSeat].team === w;
     title = mode === 'local' ? `${teamName(w)} win` : mine ? 'Victory!' : `${teamName(w)} win`;
     sub = full
-      ? `${why} ${members.join(' & ')} finished with the most sequences${G.tiebreak ? ', winning the tie on chips on the board' : ''}.`
+      ? `${why} ${members.join(' & ')} ${G.tiebreak ? `${members.length > 1 ? 'win' : 'wins'} on chips on the board (tied at ${G.seqs[w]} sequence${G.seqs[w] === 1 ? '' : 's'})` : 'finished with the most sequences'}.`
       : `${members.join(' & ')} linked ${G.seqs[w]} sequence${G.seqs[w] > 1 ? 's' : ''}.`;
-    if (mode === 'cpu') {
+    if (mode === 'cpu' && G.endReason !== 'ended') {
       const r = store.get('record', { w: 0, l: 0, gids: [] });
       if (!r.gids.includes(G.gid)) { mine ? r.w++ : r.l++; r.gids = [G.gid].concat(r.gids).slice(0, 30); store.set('record', r); }
       rec = `<p class="note">Your record against the computer: ${r.w} won, ${r.l} lost</p>`;
@@ -1303,7 +1364,7 @@ function toMenu() {
 function showScreen(name) {
   $('#menu').hidden = name !== 'menu';
   $('#game').hidden = name !== 'game';
-  if (name === 'game') requestAnimationFrame(() => { sizeBoard(); renderHand(); });
+  if (name === 'game') requestAnimationFrame(() => { renderHand(); sizeBoard(); });
   else refreshMenu();
   scrollTo(0, 0);
 }
@@ -1600,7 +1661,8 @@ $('#hand').addEventListener('click', e => {
   Sound.tick();
   clearPeek(); renderBoard(false); renderHand(); renderActions();
 });
-$('#hand').addEventListener('mouseover', e => { const b = e.target.closest('.hcard'); if (b && handVisible && !sel) peek(+b.dataset.hi); });
+const canHover = matchMedia('(hover: hover)').matches;
+$('#hand').addEventListener('mouseover', e => { if (!canHover) return; const b = e.target.closest('.hcard'); if (b && handVisible && !sel) peek(+b.dataset.hi); });
 $('#hand').addEventListener('mouseleave', clearPeek);
 function peek(hi) {
   clearPeek();
@@ -1631,7 +1693,26 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { if (!$('#rules').hidden) hide('#rules'); else if (sel) { sel = null; renderBoard(false); renderHand(); renderActions(); } }
   if (e.key === 'Enter' && sel && sel.cell != null && !(e.target.closest && e.target.closest('input'))) commit();
 });
-let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { sizeBoard(); if (G) renderHand(); }, 80); });
+let rz, lastW = innerWidth;
+addEventListener('resize', () => {
+  if (innerWidth === lastW) return; // phones fire resize when the address bar slides; ignore height-only changes
+  lastW = innerWidth;
+  clearTimeout(rz); rz = setTimeout(() => { sizeBoard(); if (G) renderHand(); }, 80);
+});
+addEventListener('orientationchange', () => setTimeout(() => { lastW = innerWidth; sizeBoard(); if (G) renderHand(); }, 250));
+document.addEventListener('visibilitychange', () => { if (!document.hidden && onlineCode && sb) fetchGame(onlineCode); });
+let dockH = 0;
+if (window.ResizeObserver) new ResizeObserver(() => { const hb = document.querySelector('.hand-box'); if (hb.offsetHeight === dockH) return; dockH = hb.offsetHeight; document.documentElement.style.setProperty('--dock', dockH + 'px'); if (phone()) sizeBoard(); }).observe(document.querySelector('.hand-box'));
+let endArmed = null;
+$('#btnEnd').onclick = async () => {
+  const b = $('#btnEnd');
+  if (!G || G.winner !== -1) return;
+  if (!endArmed) { b.textContent = 'Tap again to end now'; endArmed = setTimeout(() => { endArmed = null; b.textContent = 'End game'; }, 3000); return; }
+  clearTimeout(endArmed); endArmed = null; b.textContent = 'End game';
+  clearTimeout(cpuTimer);
+  sel = null;
+  await pushState(E.endNow(G, viewSeat));
+};
 
 /* ---------------- boot ---------------- */
 buildBoard();
