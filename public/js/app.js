@@ -388,6 +388,7 @@ function applyState(ns, opts = {}) {
   if (mode === 'cpu' || mode === 'local') store.set('local', { mode, cfg, G });
   if (ns.winner !== -1) {
     if (mode === 'online') recordOnlineResult();
+    else if (mode === 'cpu') recordCpuResult();
     if (victoryFor !== ns.gid) setTimeout(showVictory, ns.last && ns.last.seq ? 1300 : 500);
     return;
   }
@@ -496,7 +497,7 @@ function showVictory() {
     board = `<div class="final">${order.map(t => `<div class="${t === w ? 'win' : ''}"><span class="mini-chip">${chipHTML(t)}</span><span>${esc(teamName(t))}</span><b>${G.seqs[t]} seq · ${E.chipCount(G, t)} chips</b></div>`).join('')}</div>`;
   }
   const canAgain = mode !== 'online' || (onlineDoc && onlineDoc.host === myId);
-  $('#victoryBody').innerHTML = `${w >= 0 ? `<div class="big-chip">${chipHTML(w, true)}</div>` : ''}<h2>${esc(title)}</h2><p>${esc(sub)}</p>${board}${rec}${mode === 'online' ? '<div id="rankedSlot" style="display:grid;justify-items:center;width:100%"></div>' : ''}
+  $('#victoryBody').innerHTML = `${w >= 0 ? `<div class="big-chip">${chipHTML(w, true)}</div>` : ''}<h2>${esc(title)}</h2><p>${esc(sub)}</p>${board}${rec}${mode === 'online' || (mode === 'cpu' && user) ? '<div id="rankedSlot" style="display:grid;justify-items:center;width:100%"></div>' : ''}
     <div class="row" style="justify-content:center">${canAgain ? `<button class="btn primary big" data-v="again">${mode === 'online' ? 'Rematch' : 'Play again'}</button>` : '<span class="note">Waiting for the host to start a rematch.</span>'}<button class="btn" data-v="board">View the board</button><button class="btn" data-v="menu">Main menu</button></div>`;
   show('#victory');
   paintResult();
@@ -700,7 +701,9 @@ function friendlyAuthError(e) {
   if (/password/i.test(m) && /(least|short|weak|characters)/i.test(m)) return 'Pick a longer password (at least 6 characters).';
   if (/database error|relation|function .* does not exist|schema cache|could not find the function/i.test(m)) return 'The game database is not set up yet. Run supabase-setup.sql in the Supabase SQL Editor, then try again.';
   if (/signups? not allowed|signup.* disabled/i.test(m)) return 'New accounts are switched off in Supabase (Authentication → Sign In / Providers → Allow new users to sign up).';
-  if (/email.*(invalid|not authorized)|invalid.*email/i.test(m)) return 'Supabase rejected the sign-in address. Make sure "Confirm email" is off (see the README).';
+  if (/not authorized|sending confirmation|error sending/i.test(m)) return 'Supabase tried to send a confirmation email. In Supabase open Authentication → Sign In / Providers, turn OFF "Confirm email", save, then try again.';
+  if (/email not confirmed/i.test(m)) return 'This account is waiting for an email confirmation. Turn off "Confirm email" in Supabase and run the "confirm everyone" line from the README, then sign in.';
+  if (/email.*invalid|invalid.*email|email_address_invalid/i.test(m)) return `Supabase refused the sign-in address (${m}). Check that "Confirm email" is off, or change loginDomain in js/config.js.`;
   if (/rate limit|too many/i.test(m)) return 'Too many tries. Wait a minute and try again.';
   if (/fetch|network|load failed|failed to/i.test(m)) return "Can't reach the server. Check your connection and try again.";
   return m || 'Something went wrong. Try again.';
@@ -759,6 +762,13 @@ function onSignedOut() {
   if (mode === 'online') toMenu();
   if (!mode) showScreen('auth'); else toast('You were signed out. Sign in again to play online.');
 }
+function cpuRankNote() {
+  const el = $('#cpuRankNote'); if (!el) return;
+  const hard = segVal('cpuLevel') === 'hard';
+  el.hidden = !user;
+  el.innerHTML = hard ? '<b>Ranked:</b> wins against Hard opponents move you up the ladder.' : 'Practice game. Pick <b>Hard</b> to play for your rank.';
+  el.classList.toggle('ranked', hard);
+}
 function renderAuthChips() { $('#authChips').innerHTML = [0, 1, 2].map(t => chipHTML(t)).join(''); }
 function renderAuthExtras() {
   $('#authRoad').innerHTML = RANKS.map((r, i) => `<li class="rk-${r.key}" style="--i:${i}"><span class="medal">${rankIcon(r.key)}</span><b>${esc(r.name)}</b><span>${r.wins === 0 ? 'Start here' : r.wins + '+ wins'}</span></li>`).join('');
@@ -789,6 +799,7 @@ function renderMe() {
       ? `${crestHTML('sword', 'ash')}<span class="who"><b>Signed in</b><span class="sub">${setupMissing ? 'Database not set up yet' : 'Loading your profile…'}</span></span><span class="go">Profile ›</span>`
       : `<span class="crest" style="--cc:#4b5058"><svg viewBox="0 0 100 100"><use href="#rk-bastard"/></svg></span><span class="who"><b>Playing as a guest</b><span class="sub">Sign in to play online and earn a rank</span></span><span class="go">Sign in ›</span>`;
   $('#cpuNameField').hidden = !!me;
+  cpuRankNote();
   if (!$('#hall').hidden) renderHall();
 }
 
@@ -837,7 +848,7 @@ function renderBoardList() {
 }
 async function loadRecent() {
   if (!sb || !user) return;
-  const { data, error } = await sb.from('game_results').select('code,gid,winner,ranked,rule,moves,players,finished_at')
+  const { data, error } = await sb.from('game_results').select('code,gid,winner,ranked,rule,moves,players,finished_at,kind')
     .contains('player_ids', [user.id]).order('finished_at', { ascending: false }).limit(8);
   if (!error) { recentData = data || []; renderHall(); }
 }
@@ -852,7 +863,7 @@ function recentHTML() {
     const mine = (g.players || []).find(p => p.id === user.id), t = mine ? mine.team : -9;
     const res = g.winner < 0 ? ['t', 'Tie'] : g.winner === t ? ['w', 'Won'] : ['l', 'Lost'];
     const others = (g.players || []).filter(p => p.id !== user.id).map(p => esc(p.name)).join(', ');
-    return `<li><span class="res ${res[0]}">${res[1]}</span><span class="vs">vs ${others}${g.ranked ? '' : ' · unranked'}</span><span class="when">${ago(g.finished_at)}</span></li>`;
+    return `<li><span class="res ${res[0]}">${res[1]}</span><span class="vs">vs ${others}${g.kind === 'cpu' ? ' · Hard computer' : ''}${g.ranked ? '' : ' · unranked'}</span><span class="when">${ago(g.finished_at)}</span></li>`;
   }).join('')}</ul>`;
 }
 function renderHall() {
@@ -1070,15 +1081,39 @@ async function leaveLobby() {
   renderOnlinePanel();
   if (code && sb) { await sb.rpc('leave_game', { p_code: code }); refreshOpen(); }
 }
-// Every player's browser reports the finished game; the database only counts it once.
-async function recordOnlineResult() {
-  if (!sb || !user || !onlineCode || !G || G.winner === -1 || recordedGid === G.gid) return;
-  const gid = G.gid, code = onlineCode; recordedGid = gid;
+// Online: every player's browser reports the finished game; the database only counts it once.
+function recordOnlineResult() {
+  if (!sb || !user || !onlineCode || !G || G.winner === -1) return;
+  const code = onlineCode;
+  recordRanked(() => sb.rpc('record_result', { p_code: code }), 'The result could not be saved yet. It will be saved when you open this table again.');
+}
+// Computer: only games where every computer opponent is on Hard count towards the rank.
+const hardOnly = s => s.players.some(p => p.cpu) && s.players.every(p => !p.cpu || p.level === 'hard');
+function recordCpuResult() {
+  if (!G || G.winner === -1 || recordedGid === G.gid) return;
+  const gid = G.gid;
+  if (!user) return;
+  if (!hardOnly(G)) { lastResult = { gid, html: '<p class="note">Practice game. Only wins against <b>Hard</b> computer opponents count towards your rank.</p>' }; paintResult(); return; }
+  if (G.endReason === 'ended') { lastResult = { gid, html: '<p class="note">Unranked: games stopped early with End game do not count.</p>' }; paintResult(); return; }
+  if (G.moveNo < 10) { lastResult = { gid, html: '<p class="note">Unranked: ranked games need at least 10 moves.</p>' }; paintResult(); return; }
+  const st = G, seat = viewSeat;
+  recordRanked(() => sb.rpc('record_cpu_result', {
+    p_gid: st.gid, p_winner: st.winner, p_my_team: st.players[seat].team, p_moves: st.moveNo,
+    p_players: st.players.map(p => ({ id: p.cpu ? null : user.id, name: p.name, team: p.team, cpu: !!p.cpu }))
+  }), 'The result could not be saved. Check your connection.');
+}
+async function recordRanked(call, failMsg) {
+  if (!sb || !user || !G || G.winner === -1 || recordedGid === G.gid) return;
+  const gid = G.gid; recordedGid = gid;
   const before = me ? me.wins : 0, oldRank = rankFor(before);
   lastResult = { gid, html: '<p class="note">Recording the result…</p>' }; paintResult();
   let res;
-  for (let k = 0; k < 3; k++) { res = await sb.rpc('record_result', { p_code: code }); if (!res.error) break; await sleep(1500); }
-  if (res.error) { recordedGid = null; lastResult = { gid, html: '<p class="note">The result could not be saved yet. It will be saved when you open this table again.</p>' }; paintResult(); return; }
+  for (let k = 0; k < 3; k++) { res = await call(); if (!res.error) break; await sleep(1500); }
+  if (res.error) {
+    recordedGid = null;
+    const missing = /could not find the function|does not exist|schema cache/i.test(res.error.message || '');
+    lastResult = { gid, html: `<p class="note">${missing ? 'Ranked results need the latest supabase-setup.sql. Run it in the Supabase SQL Editor.' : failMsg}</p>` }; paintResult(); return;
+  }
   await loadMe(); boardAt = 0; recentData = null;
   const data = res.data || {};
   let html;
@@ -1107,6 +1142,7 @@ document.querySelector('#menu .tabs').addEventListener('click', e => { const b =
   setSeg(id, b.dataset.v);
   if (id === 'localCount') { renderLocalNames(); ruleNote('localRule', localCount()); }
   if (id === 'cpuMatch') ruleNote('cpuRule', b.dataset.v === '3way' ? 3 : 2);
+  if (id === 'cpuLevel') cpuRankNote();
   if (id === 'cpuRule' || id === 'localRule') { store.set('rule', b.dataset.v); ruleNote(id, id === 'cpuRule' ? (segVal('cpuMatch') === '3way' ? 3 : 2) : localCount()); }
 }));
 $('#onlineRule').addEventListener('click', e => {
