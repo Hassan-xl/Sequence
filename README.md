@@ -31,7 +31,10 @@ Upload this folder as a new project (or replace the files in your existing repo)
 
 ## How ranking works
 
-- Ranked = **online games between accounts** that reach at least 10 moves. Computer and same-device games are not ranked.
+- Ranked games (need at least 10 moves):
+  - **online games between accounts**
+  - **games against the computer where every computer opponent is on Hard**. Games stopped early with *End game* don't count.
+- Easy/Normal computer games and same-device games are practice only.
 - Every player's browser reports the result when a game ends; the database counts each game exactly once.
 - Players can edit their name, motto, crest and colour, but **cannot** change their own wins (enforced in the database).
 - Ranks by ranked wins (edit `ranks` in `js/config.js` to change thresholds; no database change needed):
@@ -52,6 +55,9 @@ After every chip, the whole board is re-read for that team:
 - Games already in progress pick up any missed sequences on the team's next chip.
 
 ## Admin notes
+
+- **Accounts made while "Confirm email" was still on** can't sign in. After turning it off, confirm them all with:
+  `update auth.users set email_confirmed_at = now() where email_confirmed_at is null;`
 
 - **Forgot password:** in SQL Editor run
   `update auth.users set encrypted_password = crypt('NEW_PASSWORD', gen_salt('bf')) where email = 'USERNAME@players.fivefold.app';`
