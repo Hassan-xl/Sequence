@@ -615,3 +615,5 @@ body[data-screen="game"] .embers, body[data-screen="hall"] .embers { display: no
 
 .title span { text-shadow: none; }
 .toast { pointer-events: none; }
+.rank-note { margin: 0; padding: 8px 12px; border-radius: 10px; border: 1px dashed var(--line); }
+.rank-note.ranked { border-style: solid; border-color: var(--accent); color: var(--ink); }
