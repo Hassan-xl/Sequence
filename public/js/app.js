@@ -591,8 +591,10 @@ function continueSaved() {
 /* ---------------- menu visuals ---------------- */
 function renderFan() {
   const cards = ['AS', 'KH', 'QD', 'JC', '10S'];
-  $('#fan').innerHTML = cards.map((c, i) => `<div class="fc" style="left:${i * 50}px;transform:rotate(${(i - 2) * 9}deg) translateY(${Math.abs(i - 2) * 6}px)">${cardHTML(c)}</div>`).join('')
-    + `<div class="chip-demo" style="position:absolute">${chipHTML(0, false)}</div>`;
+  const chips = [[0, 62, 0, 56], [1, 54, 0.38, 4], [2, 44, 0.74, 78]]; // team, size and x offset as fractions of card width, bottom
+  const html = cards.map((c, i) => `<div class="fc" style="--i:${i};--x:calc(var(--w) * ${(i * 0.48).toFixed(2)});--r:${(i - 2) * 9}deg;--y:${Math.abs(i - 2) * 6}px">${cardHTML(c)}</div>`).join('')
+    + chips.map(([t, sz, dx, b], i) => `<div class="fchip" style="--i:${i};--s:calc(var(--w) * ${sz / 100});--x:calc(var(--w) * ${(3.2 + dx).toFixed(2)});--b:${b}px">${chipHTML(t, i === 0)}</div>`).join('');
+  $('#fan').innerHTML = html; $('#authFan').innerHTML = html;
 }
 function renderTiles() {
   $('#themeTiles').innerHTML = Object.entries(SKINS).map(([k, S]) => `<button class="theme-tile" data-skin="${k}" data-k="${k}" aria-pressed="${k === skin}"><span class="tt-name">${S.name}</span><span class="tt-row"><span class="tt-card">${cardHTML('KS', k)}</span><span class="tt-chip">${chipHTML(0, false, '', k)}</span><span class="tt-chip">${chipHTML(1, false, '', k)}</span><span class="tt-chip">${chipHTML(2, false, '', k)}</span></span></button>`).join('');
@@ -605,7 +607,7 @@ function setSkin(k) {
   $('#heroEyebrow').textContent = SKINS[k].tag;
   buildBoard();
   if (G) { renderedKey = Array(100).fill(''); renderAll(false); }
-  if (!$('#menu').hidden) { renderFan(); renderTiles(); }
+  renderFan(); renderTiles(); renderAuthChips();
   const jd = $('#jackDemo');
   jd.innerHTML = `<div class="jd"><div class="jc">${cardHTML('JD')}</div><p><b>Two-eyed Jacks</b> (♦ ♣) are wild. Place a chip on any open square.</p></div><div class="jd"><div class="jc">${cardHTML('JS')}</div><p><b>One-eyed Jacks</b> (♠ ♥) remove one rival chip.</p></div>`;
 }
@@ -757,8 +759,10 @@ function onSignedOut() {
   if (mode === 'online') toMenu();
   if (!mode) showScreen('auth'); else toast('You were signed out. Sign in again to play online.');
 }
+function renderAuthChips() { $('#authChips').innerHTML = [0, 1, 2].map(t => chipHTML(t)).join(''); }
 function renderAuthExtras() {
-  $('#authLadder').innerHTML = ladderItems(null, true);
+  $('#authRoad').innerHTML = RANKS.map((r, i) => `<li class="rk-${r.key}" style="--i:${i}"><span class="medal">${rankIcon(r.key)}</span><b>${esc(r.name)}</b><span>${r.wins === 0 ? 'Start here' : r.wins + '+ wins'}</span></li>`).join('');
+  renderAuthChips();
   renderPickers('#auCrest', '#auColor', pickCrest, pickColor, (c, k) => { pickCrest = c; pickColor = k; });
 }
 function renderPickers(crestSel, colorSel, crest, color, onChange) {
