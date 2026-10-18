@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#061b22">
+<meta name="description" content="Fivefold: a themed five-in-a-row card board game. Play the computer, pass and play, or ranked online games with friends.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fivefold">
+<meta name="format-detection" content="telephone=no">
+<title>Fivefold</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://rkrywbtpefdtixstkaxs.supabase.co" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya:wght@500;700;800&family=Alegreya+Sans:wght@400;500;700;800&family=Pirata+One&family=Limelight&family=Cinzel:wght@600;700;800&family=Cinzel+Decorative:wght@700&family=IM+Fell+English+SC&display=swap">
+<link rel="stylesheet" href="css/styles.css?v=3">
+<script>
+  // Paint the saved theme and the right first screen before anything else loads (no flash).
+  (function () {
+    try {
+      var k = JSON.parse(localStorage.getItem('ff-skin') || '"iron"');
+      document.documentElement.dataset.skin = ['pirate', 'casino', 'egypt', 'medieval', 'iron'].indexOf(k) >= 0 ? k : 'iron';
+      var signedIn = !!localStorage.getItem('ff-auth');
+      var guest = sessionStorage.getItem('ff-guest') === '1';
+      document.documentElement.dataset.boot = signedIn || guest ? 'menu' : 'auth';
+    } catch (e) { document.documentElement.dataset.boot = 'auth'; }
+  })();
+</script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs id="sprite"></defs></svg>
+<div class="app" id="app">
+  <header class="topbar">
+    <button class="brand" id="brandBtn" aria-label="Main menu">
+      <svg class="brand-mark" viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" style="fill:var(--t0)"/><circle cx="50" cy="50" r="44" fill="none" style="stroke:var(--accent)" stroke-width="7"/><use href="#su-S" x="27" y="25" width="46" height="46" style="fill:var(--ink)"/></svg>
+      <span class="brand-name">Fivefold</span>
+    </button>
+    <div class="bar-right">
+      <div class="skins" id="skinDots" role="group" aria-label="Theme">
+        <button class="skin-dot" data-k="iron" title="Iron Realm" aria-label="Iron Realm theme"></button>
+        <button class="skin-dot" data-k="pirate" title="Pirate Cove" aria-label="Pirate Cove theme"></button>
+        <button class="skin-dot" data-k="casino" title="Royal Casino" aria-label="Royal Casino theme"></button>
+        <button class="skin-dot" data-k="egypt" title="Ancient Egypt" aria-label="Ancient Egypt theme"></button>
+        <button class="skin-dot" data-k="medieval" title="Medieval Kingdom" aria-label="Medieval Kingdom theme"></button>
+      </div>
+      <button class="icon-btn" id="soundBtn" aria-label="Sound on or off"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/><path class="mute" d="M17 9l5 6M22 9l-5 6"/></svg></button>
+      <button class="icon-btn" id="rulesBtn" aria-label="How to play"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.8-2.5 2.3-2.5 3.8"/><path d="M12 17.2v.1"/></svg></button>
+      <button class="me-btn" id="meBtn" aria-label="Your profile"></button>
+    </div>
+  </header>
+
+  <!-- ================= SIGN IN ================= -->
+  <main class="screen auth" id="auth" hidden>
+    <section class="auth-hero">
+      <div class="eyebrow">Ranked five-in-a-row</div>
+      <h1>Five<span>fold</span></h1>
+      <p class="lede">Make an account, play your friends online and climb the ranks, from Bastard all the way to King.</p>
+      <ol class="ladder mini" id="authLadder"></ol>
+    </section>
+    <section class="play-card auth-card">
+      <div class="tabs two" role="tablist">
+        <button role="tab" id="au-in" aria-selected="true">Sign in</button>
+        <button role="tab" id="au-up" aria-selected="false">Create account</button>
+      </div>
+      <form id="authForm" autocomplete="on" novalidate>
+        <label class="field"><span class="label">Username</span><input class="input" id="auUser" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20" placeholder="hassan_ali" required></label>
+        <label class="field"><span class="label">Password</span><input class="input" id="auPass" name="password" type="password" autocomplete="current-password" minlength="6" placeholder="At least 6 characters" required></label>
+        <div id="upOnly" hidden style="display:grid;gap:14px">
+          <label class="field"><span class="label">Name on the leaderboard</span><input class="input" id="auName" maxlength="24" placeholder="Hassan Ali"></label>
+          <div class="field"><span class="label">Your crest</span><div class="crest-pick" id="auCrest"></div></div>
+          <div class="field"><span class="label">House colour</span><div class="color-pick" id="auColor"></div></div>
+        </div>
+        <p class="form-err" id="authErr" role="alert" hidden></p>
+        <button class="btn primary big" id="authGo" type="submit">Sign in</button>
+      </form>
+      <button class="link-btn" id="btnGuest">Play offline as a guest</button>
+      <p class="note center-note" id="authNote">Guests can play the computer and same-device games. Online and ranked games need an account.</p>
+    </section>
+  </main>
+
+  <!-- ================= MENU ================= -->
+  <main class="screen menu" id="menu" hidden>
+    <section class="hero">
+      <div class="eyebrow" id="heroEyebrow">Two decks · One board · Five in a row</div>
+      <h1>Five<span>fold</span></h1>
+      <p class="lede">Play a card, claim its square, and link five chips before your rivals do. Two-eyed Jacks go anywhere. One-eyed Jacks knock a rival chip off the board.</p>
+      <div class="fan" id="fan" aria-hidden="true"></div>
+      <div class="label" style="margin-bottom:8px">Table theme</div>
+      <div class="themes" id="themeTiles"></div>
+    </section>
+
+    <section class="play-card">
+      <button class="me-strip" id="meStrip"></button>
+      <h2>Take a seat</h2>
+      <div class="continue" id="continueBox" hidden>
+        <div><div style="font-weight:800">Game in progress</div><div class="note" id="continueNote"></div></div>
+        <button class="btn primary" id="btnContinue">Continue</button>
+      </div>
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tab-cpu" aria-selected="true" aria-controls="p-cpu">Computer</button>
+        <button role="tab" id="tab-local" aria-selected="false" aria-controls="p-local">Same device</button>
+        <button role="tab" id="tab-online" aria-selected="false" aria-controls="p-online">Online</button>
+      </div>
+
+      <div class="tabpanel" id="p-cpu" role="tabpanel">
+        <div class="field"><span class="label">Match</span>
+          <div class="seg" id="cpuMatch">
+            <button data-v="1v1" aria-pressed="true">1 vs 1</button>
+            <button data-v="2v2" aria-pressed="false">2 vs 2 with a partner</button>
+            <button data-v="3way" aria-pressed="false">Three-way</button>
+          </div>
+        </div>
+        <div class="field"><span class="label">Opponents</span>
+          <div class="seg" id="cpuLevel">
+            <button data-v="easy" aria-pressed="false">Easy</button>
+            <button data-v="normal" aria-pressed="true">Normal</button>
+            <button data-v="hard" aria-pressed="false">Hard</button>
+          </div>
+        </div>
+        <div class="field"><span class="label">Game length</span>
+          <div class="seg rule-seg" id="cpuRule">
+            <button data-v="race" aria-pressed="true">First to 2 sequences</button>
+            <button data-v="full" aria-pressed="false">Full board</button>
+          </div>
+          <p class="note rule-note"></p>
+        </div>
+        <label class="field" id="cpuNameField"><span class="label">Your name</span><input class="input" id="cpuName" maxlength="18" placeholder="You"></label>
+        <p class="note" id="cpuRecord"></p>
+        <button class="btn primary big" id="btnStartCpu">Deal the cards</button>
+      </div>
+
+      <div class="tabpanel" id="p-local" role="tabpanel" hidden>
+        <div class="field"><span class="label">Players</span>
+          <div class="seg" id="localCount">
+            <button data-v="2" aria-pressed="true">2</button>
+            <button data-v="3" aria-pressed="false">3</button>
+            <button data-v="4" aria-pressed="false">4</button>
+            <button data-v="6" aria-pressed="false">6</button>
+          </div>
+        </div>
+        <div class="names" id="localNames"></div>
+        <div class="field"><span class="label">Game length</span>
+          <div class="seg rule-seg" id="localRule">
+            <button data-v="race" aria-pressed="true">First to 2 sequences</button>
+            <button data-v="full" aria-pressed="false">Full board</button>
+          </div>
+          <p class="note rule-note"></p>
+        </div>
+        <p class="note">Pass the device after each turn. Hands stay hidden until the next player taps to reveal. Same-device games are not ranked.</p>
+        <button class="btn primary big" id="btnStartLocal">Deal the cards</button>
+      </div>
+
+      <div class="tabpanel" id="p-online" role="tabpanel" hidden>
+        <p class="note" id="onlineWait">Connecting to the tables…</p>
+        <div id="onlineSignin" hidden style="display:grid;gap:12px">
+          <p class="note">Online games are ranked, so every player needs an account. Wins move you up from Bastard to King.</p>
+          <button class="btn primary big" id="btnOnlineSignin">Sign in or create an account</button>
+        </div>
+        <div id="onlineOff" hidden class="note">Online tables cannot be reached right now.</div>
+        <div id="onlineHome" hidden style="display:grid;gap:14px">
+          <button class="btn primary big" id="btnCreate">Open a new table</button>
+          <div class="field"><span class="label">Have a code?</span>
+            <div class="join-row"><input class="input" id="joinCode" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn" id="btnJoin">Join</button></div>
+          </div>
+          <div class="continue" id="rejoinBox" hidden><div><div style="font-weight:800">Your table <span id="rejoinCode"></span></div><div class="note">Pick up where you left off.</div></div><button class="btn" id="btnRejoin">Rejoin</button></div>
+          <div class="field"><span class="label">Open tables</span><ul class="open-list" id="openList"></ul></div>
+        </div>
+        <div id="lobby" hidden style="display:grid;gap:14px">
+          <div class="field"><span class="label">Table code</span><div class="lobby-code" id="lobbyCode">·····</div></div>
+          <div class="row"><button class="btn" id="btnCopy">Copy invite link</button><span class="note">Friends open the link, sign in and join. They can also enter the code under Online.</span></div>
+          <div class="field"><span class="label">At the table</span><ul class="plist" id="lobbyPlayers"></ul></div>
+          <div class="field"><span class="label">Game length</span>
+            <div class="seg rule-seg" id="onlineRule">
+              <button data-v="race" aria-pressed="true">First to 2 sequences</button>
+              <button data-v="full" aria-pressed="false">Full board</button>
+            </div>
+            <p class="note rule-note"></p>
+          </div>
+          <p class="note" id="lobbyHint"></p>
+          <div class="row"><button class="btn primary big" id="btnStartOnline">Start the game</button><button class="btn" id="btnLeaveLobby">Leave table</button></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ================= HALL (profile + leaderboard) ================= -->
+  <main class="screen hall" id="hall" hidden>
+    <div class="hall-tabs tabs two" role="tablist">
+      <button role="tab" id="hall-me" aria-selected="true">My profile</button>
+      <button role="tab" id="hall-board" aria-selected="false">Leaderboard</button>
+    </div>
+    <section class="panel hall-me" id="hallMe"></section>
+    <section class="panel hall-board" id="hallBoard">
+      <div class="hb-title"><h2>Leaderboard</h2><button class="icon-btn" id="btnBoardRefresh" aria-label="Refresh leaderboard"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button></div>
+      <p class="note" id="boardNote">Ranked by online wins.</p>
+      <ol class="board" id="boardList"></ol>
+    </section>
+  </main>
+
+  <!-- ================= GAME ================= -->
+  <main class="screen game" id="game" hidden>
+    <div class="board-area" id="boardArea">
+      <div class="frame" id="frame">
+        <div class="engrave top">FIVEFOLD</div>
+        <div class="plaque tl">One-eyed Jacks remove</div>
+        <div class="plaque tr">Two-eyed Jacks are wild</div>
+        <div class="mat"><div class="grid" id="grid" role="grid" aria-label="Game board"></div></div>
+        <div class="plaque bl">Two-eyed Jacks are wild</div>
+        <div class="plaque br">One-eyed Jacks remove</div>
+        <div class="engrave bottom">FIVEFOLD</div>
+      </div>
+    </div>
+    <div class="panel status" id="status" aria-live="polite"></div>
+    <div class="panel hand-box">
+      <div class="hb-head"><span class="label" id="handLabel">Your hand</span><span class="note" id="handNote"></span></div>
+      <div class="hand" id="hand"></div>
+      <div class="actions" id="actions"></div>
+    </div>
+    <div class="panel teams" id="teams"></div>
+    <div class="panel logbox">
+      <div class="pile" id="pile"></div>
+      <span class="label" id="logLabel">Captain's log</span>
+      <ol class="log" id="log"></ol>
+      <div class="game-foot"><button class="btn" id="btnMenu">Main menu</button><button class="btn" id="btnRestart">New game</button><button class="btn danger" id="btnEnd">End game</button></div>
+    </div>
+  </main>
+</div>
+
+<div class="overlay" id="handoff" hidden><div class="modal center" id="handoffBody"></div></div>
+<div class="overlay" id="victory" hidden><div class="modal center" id="victoryBody"></div></div>
+<div class="overlay" id="cardModal" hidden><div class="modal center" id="cardBody"></div></div>
+<div class="overlay" id="editProf" hidden>
+  <form class="modal" id="editForm" novalidate>
+    <h2>Edit profile</h2>
+    <label class="field"><span class="label">Name on the leaderboard</span><input class="input" id="edName" maxlength="24" required></label>
+    <label class="field"><span class="label">Motto</span><input class="input" id="edMotto" maxlength="60" placeholder="A few words under your name"></label>
+    <div class="field"><span class="label">Crest</span><div class="crest-pick" id="edCrest"></div></div>
+    <div class="field"><span class="label">House colour</span><div class="color-pick" id="edColor"></div></div>
+    <p class="form-err" id="edErr" role="alert" hidden></p>
+    <div class="row"><button class="btn primary" type="submit" id="edSave">Save</button><button class="btn" type="button" id="edCancel">Cancel</button></div>
+  </form>
+</div>
+<div class="overlay" id="rules" hidden>
+  <div class="modal">
+    <h2>How to play</h2>
+    <p>Every card except the Jacks appears twice on the board. The four corners are free squares that count for everyone.</p>
+    <h3>Your turn</h3>
+    <ul>
+      <li>Pick a card from your hand. Its two squares light up.</li>
+      <li>Tap a lit square, then tap it again (or press Place chip) to claim it. You draw a new card automatically.</li>
+      <li>If both squares for a card are taken, it is dead. Swap it for a fresh card, once per turn.</li>
+    </ul>
+    <h3>Jacks</h3>
+    <div class="jack-demo" id="jackDemo"></div>
+    <p class="note">Chips in a finished sequence are locked and cannot be removed.</p>
+    <h3>Sequences</h3>
+    <ul>
+      <li>A sequence is five of your chips in a row: across, down or diagonal. Free corners count as yours.</li>
+      <li>Sequences that cross each other can share chips. A new diagonal can run straight through chips you already used across and down.</li>
+      <li>Two sequences on the same line may share one chip, so a run of nine or ten in a row counts as two sequences, in whatever order you filled it.</li>
+    </ul>
+    <h3>Winning</h3>
+    <ul>
+      <li><b>First to 2 sequences:</b> two teams need two sequences, three teams need one. First to get there wins.</li>
+      <li><b>Full board:</b> keep playing until the board is full or the cards run out. The team with the most sequences wins. If that's tied, the team with more chips on the board wins.</li>
+      <li><b>End game</b> stops the game at any time (online, only the host can). The team with the most sequences wins, then the most chips on the board.</li>
+    </ul>
+    <h3>Ranks</h3>
+    <p class="note">Online games between accounts are ranked once they reach 10 moves. Every win moves you up the ladder.</p>
+    <ol class="ladder" id="rulesLadder"></ol>
+    <button class="btn primary" id="rulesClose">Got it</button>
+  </div>
+</div>
+<div class="toast" id="toast" hidden role="status"></div>
+<canvas class="fx" id="fx"></canvas>
+
+<script src="js/config.js?v=3"></script>
+<script src="js/supabase.js?v=2.117.2" defer></script>
+<script src="js/engine.js?v=3" defer></script>
+<script src="js/app.js?v=3" defer></script>
+</body>
+</html>
