@@ -309,7 +309,9 @@ const Engine = (() => {
 
   return {
     LAYOUT, CORNER, POS, rankOf, suitOf, isJack, isTwoEyed, isOneEyed,
-    create, targets, scanSeqs, isDead, hasMove, canSwap, openSquares, chipCount, endNow, play, swapDead, pass, aiChoose, aiApply, teamsFor, handSize
+    create, targets, scanSeqs, isDead, hasMove, canSwap, openSquares, chipCount, endNow, play, swapDead, pass, aiChoose, aiApply, teamsFor, handSize,
+    // helpers shared with the Power Cards variant (power.js); the classic game does not change
+    draw, pushLog, finish, countWin, CELL_WIN, shuffle
   };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;

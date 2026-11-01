@@ -19,6 +19,7 @@
 <link rel="preconnect" href="https://rkrywbtpefdtixstkaxs.supabase.co" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya:wght@500;700;800&family=Alegreya+Sans:wght@400;500;700;800&family=Pirata+One&family=Limelight&family=Cinzel:wght@600;700;800&family=Cinzel+Decorative:wght@700&family=IM+Fell+English+SC&display=swap">
 <link rel="stylesheet" href="css/styles.css?v=5">
+<link rel="stylesheet" href="css/power.css?v=1">
 <script>
   // Paint the saved theme and the right first screen before anything else loads (no flash).
   (function () {
@@ -107,6 +108,13 @@
     <section class="play-card">
       <button class="me-strip" id="meStrip"></button>
       <h2>Take a seat</h2>
+      <div class="field"><span class="label">Game</span>
+        <div class="variant" id="variantPick" role="radiogroup" aria-label="Game variant">
+          <button class="vt" data-v="classic" role="radio" aria-checked="true"><span class="vt-art vt-classic" id="vtClassic" aria-hidden="true"></span><span class="vt-name">Classic</span><span class="vt-sub">The game you know</span></button>
+          <button class="vt power" data-v="power" role="radio" aria-checked="false"><span class="vt-art" id="vtFan" aria-hidden="true"></span><span class="vt-name">Power Cards</span><span class="vt-sub">6 special cards · one per team</span></button>
+        </div>
+        <div class="variant-note"><p class="note" id="variantNote"></p><button class="linkbtn" id="btnPwRules" type="button">See the 6 power cards</button></div>
+      </div>
       <div class="continue" id="continueBox" hidden>
         <div><div style="font-weight:800">Game in progress</div><div class="note" id="continueNote"></div></div>
         <button class="btn primary" id="btnContinue">Continue</button>
@@ -192,6 +200,12 @@
             </div>
             <p class="note rule-note"></p>
           </div>
+          <div class="field"><span class="label">Game</span>
+            <div class="seg" id="onlineVariant">
+              <button data-v="classic" aria-pressed="true">Classic</button>
+              <button data-v="power" aria-pressed="false">Power Cards</button>
+            </div>
+          </div>
           <p class="note" id="lobbyHint"></p>
           <div class="row"><button class="btn primary big" id="btnStartOnline">Start the game</button><button class="btn" id="btnLeaveLobby">Leave table</button></div>
         </div>
@@ -237,7 +251,7 @@
       <div class="pile" id="pile"></div>
       <span class="label" id="logLabel">Captain's log</span>
       <ol class="log" id="log"></ol>
-      <div class="game-foot"><button class="btn" id="btnMenu">Main menu</button><button class="btn" id="btnRestart">New game</button><button class="btn danger" id="btnEnd">End game</button></div>
+      <div class="game-foot"><button class="btn" id="btnMenu">Main menu</button><button class="btn" id="btnRestart">New game</button><button class="btn" id="btnPlayers" hidden>Players</button><button class="btn danger" id="btnEnd">End game</button></div>
     </div>
   </main>
 </div>
@@ -284,6 +298,8 @@
     <h3>Ranks</h3>
     <p class="note">Ranked games: online games between accounts, and games against <b>Hard</b> computer opponents. A game needs at least 10 moves to count, and games stopped with End game against the computer don't count. Every ranked win moves you up the ladder.</p>
     <ol class="ladder" id="rulesLadder"></ol>
+    <h3>Power Cards variant</h3>
+    <p class="note">A separate game mode with six special cards (Explosion, Color Change, Table Flipper, Turn Skipper, Team Swap and Mine). <button class="linkbtn" id="btnPwRules2" type="button">Read the Power Cards rules</button></p>
     <button class="btn primary" id="rulesClose">Got it</button>
   </div>
 </div>
@@ -292,7 +308,9 @@
 
 <script src="js/config.js?v=3"></script>
 <script src="js/supabase.js?v=2.117.2" defer></script>
-<script src="js/engine.js?v=3" defer></script>
-<script src="js/app.js?v=5" defer></script>
+<script src="js/engine.js?v=4" defer></script>
+<script src="js/power.js?v=1" defer></script>
+<script src="js/power-ui.js?v=1" defer></script>
+<script src="js/app.js?v=6" defer></script>
 </body>
 </html>

@@ -1,6 +1,9 @@
 (() => {
 const $ = s => document.querySelector(s);
 const E = Engine;
+// Power Cards variant: games whose state has a `pw` block use the Power rules (power.js); classic games use Engine.
+const PU = typeof PowerUI !== 'undefined' ? PowerUI : null;
+const R = s => (s && s.pw && typeof Power !== 'undefined' ? Power : E);
 const store = {
   get(k, d) { try { const v = localStorage.getItem('ff-' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { if (v == null) localStorage.removeItem('ff-' + k); else localStorage.setItem('ff-' + k, JSON.stringify(v)); } catch (e) {} }
@@ -181,6 +184,7 @@ const myTeam = () => G.players[viewSeat] ? G.players[viewSeat].team : -1;
 const myHand = () => (G && G.hands[viewSeat]) || [];
 function canActNow() {
   if (!G || G.winner !== -1 || busy || G.turn !== viewSeat || !handVisible) return false;
+  if (G.pw && G.pw.flip) return false;
   return !G.players[G.turn].cpu;
 }
 
@@ -264,6 +268,7 @@ function renderBoard(newMove) {
     renderedKey[i] = key;
   }
   drawLines(newMove);
+  if (PU) PU.paintBoard();
 }
 
 /* ---------------- side panels ---------------- */
@@ -273,15 +278,17 @@ function renderStatus() {
   if (!G) { el.innerHTML = ''; return; }
   const p = G.players[G.turn];
   let t1, t2, who = p.team, mine = false;
-  if (G.winner === -2) { t1 = 'Stalemate'; t2 = 'Nobody can move'; who = -1; }
+  if (G.winner === -4) { t1 = 'Table flipped'; t2 = 'No winner this time'; who = -1; }
+  else if (G.winner === -2) { t1 = 'Stalemate'; t2 = 'Nobody can move'; who = -1; }
   else if (G.winner === -3) { t1 = 'Tied game'; t2 = 'Game over'; who = -1; }
   else if (G.winner >= 0) { t1 = `${teamName(G.winner)} win`; t2 = 'Game over'; who = G.winner; }
+  else if (G.pw && G.pw.flip) { t1 = 'Table flip vote'; t2 = `${esc(teamName(G.pw.flip.team))} is deciding${DOTS}`; who = G.pw.flip.team; }
   else if (mode === 'local' && !handVisible) { t1 = `Pass to ${p.name}`; t2 = esc(teamName(p.team)); }
   else if (canActNow()) { t1 = mode === 'local' ? `${p.name}, your turn` : 'Your turn'; t2 = 'Pick a card, then a square'; mine = true; }
   else if (p.cpu) { t1 = p.name; t2 = `is thinking${DOTS}`; }
   else { t1 = `${p.name}'s turn`; t2 = `${esc(teamName(p.team))} · waiting${DOTS}`; }
   el.classList.toggle('mine', mine);
-  el.innerHTML = `<div class="who">${who >= 0 ? chipHTML(who) : ''}</div><div class="txt"><div class="t1l">${esc(t1)}</div><div class="t2l">${t2}</div></div>`;
+  el.innerHTML = `<div class="who">${who >= 0 ? chipHTML(who) : ''}</div><div class="txt"><div class="t1l">${esc(t1)}</div><div class="t2l">${t2}</div>${G.pw && PU ? PU.statusPills() : ''}</div>`;
 }
 function renderTeams() {
   const el = $('#teams'); if (!G) { el.innerHTML = ''; return; }
@@ -293,7 +300,7 @@ function renderTeams() {
     let pips = '';
     if (G.rule === 'full') pips = `<span class="score"><i></i>${G.seqs[t]}</span>`;
     else for (let k = 0; k < G.seqToWin; k++) pips += `<i class="${k < G.seqs[t] ? 'on' : ''}"></i>`;
-    h += `<div class="team ${cur.team === t && G.winner === -1 ? 'now' : ''}"><div class="sw">${chipHTML(t)}</div><div style="min-width:0"><div class="tn">${esc(teamName(t))}</div><div class="tm">${members.join(', ')}</div></div><div class="seqs" title="${G.seqs[t]} sequence${G.seqs[t] === 1 ? '' : 's'}">${pips}</div></div>`;
+    h += `<div class="team ${cur.team === t && G.winner === -1 ? 'now' : ''}"><div class="sw">${chipHTML(t)}</div><div style="min-width:0"><div class="tn">${esc(teamName(t))}</div><div class="tm">${members.join(', ')}</div>${G.pw && PU ? PU.teamBadge(t) : ''}</div><div class="seqs" title="${G.seqs[t]} sequence${G.seqs[t] === 1 ? '' : 's'}">${pips}</div></div>`;
   }
   el.innerHTML = h;
 }
@@ -311,7 +318,8 @@ function renderLog() {
     else if (e.kind === 'remove') txt = `${n} used ${tagHTML(e.card)} to knock off a ${esc(teamName(e.victim))} chip`;
     else if (e.kind === 'swap') txt = `${n} swapped a dead ${tagHTML(e.card)}`;
     else if (e.kind === 'end') txt = `${n} ended the game`;
-    else txt = `${n} had no move`;
+    else if (e.kind === 'pass') txt = `${n} had no move`;
+    else txt = (PU && PU.logText(e, n)) || `${n} made a move`;
     return `<li><span class="ld" style="background:var(--t${p.team})"></span><span>${txt}</span></li>`;
   }).join('') || '<li class="note">No moves yet.</li>';
 }
@@ -320,10 +328,12 @@ function renderHand(fresh) {
   const hand = myHand();
   el.classList.toggle('hidden', !handVisible);
   const n = hand.length;
+  const pwc = G && G.pw && PU && handVisible ? PU.handCard() : '';
+  const slots = n + (pwc ? 1.2 : 0);
   const avail = el.clientWidth || 320;
-  const w = Math.min(phone() ? 50 : 76, Math.max(44, avail / Math.max(4.2, n * 0.82)));
+  const w = Math.min(phone() ? 50 : 76, Math.max(44, avail / Math.max(4.2, slots * 0.82)));
   el.style.setProperty('--w', w + 'px');
-  const overlap = n > 1 ? Math.max(0, (n * w - avail + 8) / (n - 1)) : 0;
+  const overlap = slots > 1 ? Math.max(0, (slots * w - avail + 8) / (slots - 1)) : 0;
   el.style.setProperty('--overlap', overlap + 'px');
   const key = hand.join(',') + '|' + viewSeat + '|' + (G && G.gid);
   const changed = key !== prevHandKey;
@@ -336,7 +346,7 @@ function renderHand(fresh) {
     else if (G && E.isDead(G, c)) badge = '<span class="badge dead">Dead</span>';
     const dealt = handVisible && changed && (fresh || (i === n - 1 && n >= prevLen)) ? ' dealt' : '';
     return `<button class="hcard${sel && sel.hi === i ? ' sel' : ''}${dealt}" data-hi="${i}" style="--rot:${rot}deg;--dy:${sel && sel.hi === i ? -18 : dy}px;${fresh ? `animation-delay:${i * 70}ms` : ''}" aria-label="${handVisible ? cardName(c) : 'Hidden card'}">${badge}${cardHTML(c)}</button>`;
-  }).join('');
+  }).join('') + pwc;
   prevHandKey = key;
   $('#handLabel').innerHTML = mode === 'local' && G ? `<b>${esc(G.players[viewSeat].name)}</b>'s hand` : 'Your hand';
   $('#handNote').textContent = G ? `${n} cards` : '';
@@ -345,7 +355,9 @@ function renderActions() {
   const el = $('#actions'); if (!G) { el.innerHTML = ''; return; }
   if (G.winner !== -1) { el.innerHTML = `<button class="btn primary" data-act="result">See the result</button>`; return; }
   if (mode === 'local' && !handVisible) { el.innerHTML = `<button class="btn primary" data-act="reveal">Show ${esc(G.players[G.turn].name)}'s hand</button>`; return; }
+  if (G.pw && G.pw.flip) { el.innerHTML = `<span class="hint">Table flip vote in progress…</span>`; return; }
   if (!canActNow()) { el.innerHTML = `<span class="hint">Tap a card to see where it goes.</span>`; return; }
+  if (PU && PU.actions(el)) return;
   if (sel) {
     const card = myHand()[sel.hi];
     if (E.isDead(G, card)) {
@@ -365,7 +377,7 @@ function renderActions() {
     return;
   }
   if (!E.hasMove(G, viewSeat) && !E.canSwap(G, viewSeat)) { el.innerHTML = `<span class="hint">None of your cards can be played.</span><button class="btn primary" data-act="pass">Pass the turn</button>`; return; }
-  el.innerHTML = `<span class="hint">Pick a card to play</span>`;
+  el.innerHTML = `<span class="hint">${G.pw && G.pw.cards[myTeam()] && G.pw.cards[myTeam()].st === 'held' ? 'Pick a card, or tap your power card' : 'Pick a card to play'}</span>`;
 }
 function renderAll(newMove, fresh) {
   renderBoard(newMove); renderHand(fresh); renderActions(); renderStatus(); renderTeams(); renderPile(); renderLog();
@@ -373,6 +385,7 @@ function renderAll(newMove, fresh) {
   const isHost = mode !== 'online' || (onlineDoc && onlineDoc.host === myId);
   $('#btnRestart').hidden = !isHost;
   $('#btnEnd').hidden = !isHost || !G || G.winner !== -1;
+  $('#btnPlayers').hidden = !(mode === 'online' && onlineDoc && onlineDoc.host === myId && G && G.winner === -1);
 }
 
 /* ---------------- flow ---------------- */
@@ -381,6 +394,7 @@ function applyState(ns, opts = {}) {
   G = ns; sel = null;
   const fresh = !prev || prev.gid !== ns.gid;
   const newMove = !fresh && ns.moveNo !== prev.moveNo;
+  if (ns.pw || (prev && prev.pw)) { syncSeat(); if (PU) PU.onState(prev, ns, fresh); }
   if (fresh) { renderedKey = Array(100).fill(''); cells.forEach(c => (c.lastElementChild.innerHTML = '')); victoryFor = null; linesDrawn = { gid: ns.gid, n: ns.lines.length }; }
   renderAll(newMove, fresh);
   if (newMove) effects(prev, ns);
@@ -389,14 +403,25 @@ function applyState(ns, opts = {}) {
   if (ns.winner !== -1) {
     if (mode === 'online') recordOnlineResult();
     else if (mode === 'cpu') recordCpuResult();
-    if (victoryFor !== ns.gid) setTimeout(showVictory, ns.last && ns.last.seq ? 1300 : 500);
+    if (victoryFor !== ns.gid) afterFx(showVictory, ns.last && ns.last.seq ? 1300 : 500);
     return;
   }
-  if (mode === 'cpu') scheduleCpu();
+  if (mode === 'cpu' || mode === 'online') scheduleCpu();
   if (mode === 'local' && !fresh && ns.turn !== viewSeat) showHandoff();
+}
+// Runs fn once the Power Cards announcements have finished (immediately in classic games).
+function afterFx(fn, ms) { setTimeout(function wait() { if (PU && PU.busyMs() > 0) setTimeout(wait, 250); else fn(); }, ms); }
+// Team Swap can move people between seats, so find "my" seat again by id.
+function syncSeat() {
+  const id = mode === 'online' ? myId : mode === 'cpu' ? 's0' : null;
+  if (!id || !G) return;
+  const k = G.players.findIndex(p => p.id === id);
+  if (k >= 0) viewSeat = k;
 }
 function effects(prev, ns) {
   const since = ns.log.filter(e => e.n >= prev.moveNo);
+  if (ns.pw && PU) PU.effects(prev, ns);
+  since.filter(e => e.kind === 'kick').forEach(e => toast(`${ns.players[e.pi] ? ns.players[e.pi].name.replace(/ \(CPU\)$/, '') : 'A player'} left. The computer took the seat.`));
   if (since.some(e => e.kind === 'swap')) Sound.card();
   const L = ns.last;
   if (!L || L.n < prev.moveNo) return;
@@ -414,31 +439,38 @@ function effects(prev, ns) {
     }, 380);
   } else if (L.kind === 'remove') Sound.remove();
 }
+// Computer turns. Online, only the host's screen plays for seats handed to the computer.
 function scheduleCpu() {
   clearTimeout(cpuTimer);
-  if (!G || G.winner !== -1 || !G.players[G.turn].cpu) return;
-  const gid = G.gid;
-  cpuTimer = setTimeout(() => {
-    if (!G || G.gid !== gid || G.winner !== -1 || !G.players[G.turn].cpu || mode !== 'cpu') return;
-    try { applyState(E.aiApply(G, G.turn)); } catch (e) { console.error(e); }
-  }, 850 + Math.random() * 650);
+  if (!G || G.winner !== -1 || !G.players[G.turn].cpu || (G.pw && G.pw.flip)) return;
+  if (mode === 'online' && !(onlineDoc && onlineDoc.host === myId)) return;
+  if (mode !== 'cpu' && mode !== 'online') return;
+  const gid = G.gid, mv = G.moveNo, m = mode;
+  const go = () => {
+    if (!G || G.gid !== gid || G.moveNo !== mv || G.winner !== -1 || !G.players[G.turn].cpu || mode !== m || (G.pw && G.pw.flip)) return;
+    if (PU && PU.busyMs() > 0) { cpuTimer = setTimeout(go, 300); return; }
+    let ns;
+    try { ns = R(G).aiApply(G, G.turn); } catch (e) { console.error(e); return; }
+    if (m === 'online') pushState(ns, true); else applyState(ns);
+  };
+  cpuTimer = setTimeout(go, 850 + Math.random() * 650);
 }
 async function commit() {
   if (!sel || sel.cell == null || !canActNow()) return;
   let ns;
-  try { ns = E.play(G, viewSeat, sel.hi, sel.cell); } catch (e) { toast('That move is not allowed.'); return; }
+  try { ns = R(G).play(G, viewSeat, sel.hi, sel.cell); } catch (e) { toast('That move is not allowed.'); return; }
   await pushState(ns);
 }
 async function doSwap() {
   if (!sel || !canActNow()) return;
-  let ns; try { ns = E.swapDead(G, viewSeat, sel.hi); } catch (e) { toast('You can swap one dead card per turn.'); return; }
+  let ns; try { ns = R(G).swapDead(G, viewSeat, sel.hi); } catch (e) { toast('You can swap one dead card per turn.'); return; }
   await pushState(ns);
 }
 async function doPass() {
   if (!canActNow()) return;
-  await pushState(E.pass(G, viewSeat));
+  await pushState(R(G).pass(G, viewSeat));
 }
-async function pushState(ns) {
+async function pushState(ns, quiet) {
   if (mode !== 'online') { applyState(ns); return; }
   busy = true;
   const before = G;
@@ -446,7 +478,7 @@ async function pushState(ns) {
   try {
     await saveMove(before, ns);
   } catch (e) {
-    toast(e && e.conflict ? 'The table changed before your move landed. Showing the latest board.' : 'Your move did not reach the table. Check your connection and try again.');
+    if (!quiet) toast(e && e.conflict ? 'The table changed before your move landed. Showing the latest board.' : 'Your move did not reach the table. Check your connection and try again.');
     G = null; applyState(before);
     if (onlineCode) fetchGame(onlineCode);
   }
@@ -473,10 +505,15 @@ function showVictory() {
   victoryFor = G.gid;
   const w = G.winner;
   let title, sub, rec = '';
-  const full = G.rule === 'full' || G.endReason === 'ended';
+  const full = w !== -4 && (G.rule === 'full' || G.endReason === 'ended');
   const ender = G.log.find(e => e.kind === 'end');
   const why = { board: 'The board is full.', cards: 'All the cards have been played.', stuck: 'Nobody can make another move.', ended: `${ender && G.players[ender.pi] ? G.players[ender.pi].name : 'The host'} ended the game.` }[G.endReason] || '';
-  if (w === -2) { title = 'Stalemate'; sub = 'Every square that matters is taken and nobody can move.'; }
+  if (w === -4) {
+    const by = G.log.find(e => e.kind === 'pw' && e.p === 'table');
+    title = 'Table flipped!';
+    sub = `${by && G.players[by.pi] ? G.players[by.pi].name : 'A player'} flipped the table for ${teamName(G.flipTeam)}. Nobody wins this one, and the flipping team gets a 7-day Table Flipper timer.`;
+  }
+  else if (w === -2) { title = 'Stalemate'; sub = 'Every square that matters is taken and nobody can move.'; }
   else if (w === -3) { title = 'Tied game'; sub = `${why} Same number of sequences and chips on the board.`; }
   else {
     const members = G.players.filter(p => p.team === w).map(p => p.name);
@@ -497,11 +534,11 @@ function showVictory() {
     board = `<div class="final">${order.map(t => `<div class="${t === w ? 'win' : ''}"><span class="mini-chip">${chipHTML(t)}</span><span>${esc(teamName(t))}</span><b>${G.seqs[t]} seq · ${E.chipCount(G, t)} chips</b></div>`).join('')}</div>`;
   }
   const canAgain = mode !== 'online' || (onlineDoc && onlineDoc.host === myId);
-  $('#victoryBody').innerHTML = `${w >= 0 ? `<div class="big-chip">${chipHTML(w, true)}</div>` : ''}<h2>${esc(title)}</h2><p>${esc(sub)}</p>${board}${rec}${mode === 'online' || (mode === 'cpu' && user) ? '<div id="rankedSlot" style="display:grid;justify-items:center;width:100%"></div>' : ''}
+  $('#victoryBody').innerHTML = `${w >= 0 ? `<div class="big-chip">${chipHTML(w, true)}</div>` : ''}<h2>${esc(title)}</h2><p>${esc(sub)}</p>${board}${G.pw && PU ? PU.revealHTML() : ''}${rec}${mode === 'online' || (mode === 'cpu' && user) ? '<div id="rankedSlot" style="display:grid;justify-items:center;width:100%"></div>' : ''}
     <div class="row" style="justify-content:center">${canAgain ? `<button class="btn primary big" data-v="again">${mode === 'online' ? 'Rematch' : 'Play again'}</button>` : '<span class="note">Waiting for the host to start a rematch.</span>'}<button class="btn" data-v="board">View the board</button><button class="btn" data-v="menu">Main menu</button></div>`;
   show('#victory');
   paintResult();
-  if (first) { Sound.win(); FX.rain(FX.colors()); }
+  if (first && w !== -4) { Sound.win(); FX.rain(FX.colors()); }
 }
 $('#victoryBody').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -523,7 +560,9 @@ function startCpu(c) {
   else if (match === '3way') players = [{ name: nm }, bot(0), bot(1)];
   else players = [{ name: nm }, bot(0)];
   players.forEach((p, i) => (p.id = 's' + i));
-  begin('cpu', E.create(players, { rule }), { match, level, name: nm, rule });
+  const v = c ? c.variant : variant();
+  if (v === 'power' && PU) players[0].flipUntil = PU.myTimer(myId, myFlipServer);
+  begin('cpu', makeGame(players, { rule }, v), { match, level, name: nm, rule, variant: v });
 }
 function localCount() { return +segVal('localCount'); }
 function renderLocalNames() {
@@ -538,7 +577,24 @@ function startLocal(c) {
     names = Array.from({ length: n }, (_, i) => $('#ln' + i).value.trim() || `Player ${i + 1}`);
     store.set('localNames', Array.from({ length: n }, (_, i) => $('#ln' + i).value.trim()));
   }
-  begin('local', E.create(names.map((name, i) => ({ id: 's' + i, name })), { rule }), { names, rule });
+  const v = c ? c.variant : variant();
+  begin('local', makeGame(names.map((name, i) => ({ id: 's' + i, name, flipUntil: v === 'power' && PU ? PU.nameTimer(name) : 0 })), { rule }, v), { names, rule, variant: v });
+}
+const variant = () => (store.get('variant', 'classic') === 'power' && typeof Power !== 'undefined' ? 'power' : 'classic');
+const makeGame = (players, opts, v) => (v === 'power' && typeof Power !== 'undefined' ? Power.create(players, opts) : E.create(players, opts));
+function setVariant(v) {
+  v = v === 'power' ? 'power' : 'classic';
+  store.set('variant', v);
+  document.querySelectorAll('#variantPick .vt').forEach(b => b.setAttribute('aria-checked', b.dataset.v === v));
+  document.querySelector('#menu .play-card').dataset.variant = v;
+  $('#variantNote').textContent = v === 'power'
+    ? 'Each team gets one secret special card. Works against the computer, on one device and online.'
+    : 'Standard rules, exactly as before.';
+  $('#btnStartCpu').textContent = $('#btnStartLocal').textContent = v === 'power' ? 'Deal the Power Cards' : 'Deal the cards';
+}
+function renderVariantArt() {
+  if (PU) $('#vtFan').innerHTML = PU.fanHTML();
+  $('#vtClassic').innerHTML = ['AS', 'KH'].map((c, i) => `<span class="cf-mini" style="--r:${i ? 10 : -8}deg">${cardHTML(c)}</span>`).join('');
 }
 function begin(m, state, c) {
   leaveOnlineWatch();
@@ -572,9 +628,9 @@ function refreshMenu() {
   const saved = store.get('local', null);
   const ok = saved && saved.G && saved.G.winner === -1 && saved.G.v === 1;
   $('#continueBox').hidden = !ok;
-  if (ok) $('#continueNote').textContent = saved.mode === 'cpu'
+  if (ok) $('#continueNote').textContent = (saved.G.pw ? 'Power Cards · ' : '') + (saved.mode === 'cpu'
     ? `Against the computer · ${saved.G.rule === 'full' ? 'Full board' : 'First to ' + saved.G.seqToWin} · move ${saved.G.moveNo + 1}`
-    : `Same device · ${saved.G.rule === 'full' ? 'Full board' : 'First to ' + saved.G.seqToWin} · ${saved.G.players.map(p => p.name).join(', ')}`;
+    : `Same device · ${saved.G.rule === 'full' ? 'Full board' : 'First to ' + saved.G.seqToWin} · ${saved.G.players.map(p => p.name).join(', ')}`);
   const r = store.get(recordKey(), null);
   $('#cpuRecord').textContent = r ? `Your record: ${r.w} won, ${r.l} lost` : '';
   $('#cpuName').value = $('#cpuName').value || store.get('name', '');
@@ -608,7 +664,7 @@ function setSkin(k) {
   $('#heroEyebrow').textContent = SKINS[k].tag;
   buildBoard();
   if (G) { renderedKey = Array(100).fill(''); renderAll(false); }
-  renderFan(); renderTiles(); renderAuthChips();
+  renderFan(); renderTiles(); renderAuthChips(); renderVariantArt();
   const jd = $('#jackDemo');
   jd.innerHTML = `<div class="jd"><div class="jc">${cardHTML('JD')}</div><p><b>Two-eyed Jacks</b> (♦ ♣) are wild. Place a chip on any open square.</p></div><div class="jd"><div class="jc">${cardHTML('JS')}</div><p><b>One-eyed Jacks</b> (♠ ♥) remove one rival chip.</p></div>`;
 }
@@ -639,6 +695,7 @@ const sess = {
 };
 
 let sb = null, user = null, me = store.get('me', null), myId = null, setupMissing = false;
+let myFlipServer = null; // Power Cards: Table Flipper timer saved on the account (needs supabase-power-cards.sql)
 let boardData = null, boardAt = 0, myPlace = null, recentData = null, hallTab = 'me';
 
 function initSupabase() {
@@ -676,8 +733,14 @@ async function loadMe() {
     ({ data, error } = await sb.from('profiles').select(PROFILE_COLS).eq('id', user.id).maybeSingle());
   }
   if (error) { if (/relation|schema cache|does not exist/i.test(error.message || '')) { setupMissing = true; renderMe(); } return me; }
-  if (data) { me = data; setupMissing = false; store.set('me', me); renderMe(); }
+  if (data) { me = data; setupMissing = false; store.set('me', me); renderMe(); loadFlipTimer(); }
   return me;
+}
+// Optional column; if supabase-power-cards.sql was never run this quietly does nothing.
+async function loadFlipTimer() {
+  if (!sb || !user) return;
+  const { data, error } = await sb.from('profiles').select('flip_until').eq('id', user.id).maybeSingle();
+  if (!error && data) { myFlipServer = data.flip_until; if (!$('#hall').hidden) renderHall(); }
 }
 
 /* --- sign in / create account --- */
@@ -878,6 +941,7 @@ function renderHall() {
     <div class="prof-head">${crestHTML(me.crest, me.color)}<div style="min-width:0"><h2>${esc(me.display_name)}</h2><div class="handle">@${esc(me.username)}</div>${me.motto ? `<div class="motto">“${esc(me.motto)}”</div>` : ''}<div class="tagrow">${rankHTML(me.wins)}</div></div></div>
     <div class="stats"><div class="stat"><b>${me.wins}</b><span>Wins</span></div><div class="stat"><b>${me.games}</b><span>Played</span></div><div class="stat"><b>${pct(me.wins, me.games)}</b><span>Win rate</span></div><div class="stat"><b>${myPlace ? '#' + myPlace : '–'}</b><span>Place</span></div></div>
     <div class="progress"><div class="lbl"><span>${esc(r.name)}</span><span>${nx ? `${plural(nx.wins - me.wins, 'more win')} to ${esc(nx.name)}` : 'Top of the ladder'}</span></div><div class="bar"><i style="width:${prog}%"></i></div></div>
+    ${PU ? PU.timerHTML(PU.myTimer(myId, myFlipServer), true) : ''}
     <div class="field"><span class="label">The ladder</span><ol class="ladder">${ladderItems(me.wins)}</ol></div>
     <div class="field"><span class="label">Recent online games</span>${recentHTML()}</div>
     <div class="prof-actions">${mode && G ? '<button class="btn primary" data-h="back">Back to the game</button>' : '<button class="btn primary" data-h="play">Play</button>'}<button class="btn" data-h="edit">Edit profile</button><button class="btn danger" data-h="out">Sign out</button></div>`;
@@ -891,6 +955,11 @@ function showPlayerCard(id) {
     <button class="btn primary" data-close>Close</button>`;
   $('#cardBody .crest').style.setProperty('--cs', '84px');
   show('#cardModal');
+  if (sb && PU) sb.from('profiles').select('flip_until').eq('id', id).maybeSingle().then(({ data }) => {
+    const h = data && data.flip_until ? PU.timerHTML(Date.parse(data.flip_until)) : '';
+    const note = $('#cardBody > .note:last-of-type');
+    if (h && note && !$('#cardModal').hidden) note.insertAdjacentHTML('beforebegin', h);
+  });
 }
 function openEdit() {
   if (!me) return;
@@ -956,15 +1025,18 @@ function renderOnlinePanel() {
   $('#rejoinBox').hidden = !saved || inLobby;
   if (saved) $('#rejoinCode').textContent = saved;
   $('#openList').innerHTML = openGames.length
-    ? openGames.map(g => `<li><span><span class="code">${esc(g.code)}</span> <span class="note">· ${esc(g.players[0] ? g.players[0].name : '')} · ${g.players.length} seated</span></span><button class="btn" data-join="${esc(g.code)}">Join</button></li>`).join('')
+    ? openGames.map(g => `<li><span><span class="code">${esc(g.code)}</span> ${g.variant === 'power' ? ' <span class="pw-tagmini">Power</span>' : ''}<span class="note">· ${esc(g.players[0] ? g.players[0].name : '')} · ${g.players.length} seated</span></span><button class="btn" data-join="${esc(g.code)}">Join</button></li>`).join('')
     : '<li class="note">No open tables right now. Open one and send the invite link.</li>';
   if (inLobby) renderLobby();
 }
 function renderLobby() {
   const d = onlineDoc, n = d.players.length, teams = E.teamsFor(n);
   $('#lobbyCode').textContent = d.code;
-  $('#lobbyPlayers').innerHTML = d.players.map((p, i) => `<li><span class="mini-chip">${chipHTML(i % teams)}</span>${crestHTML(p.crest, p.color)}<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}</span>${rankHTML(p.wins, true)}<span class="tag">${p.id === d.host ? 'Host' : ''}${p.id === myId ? (p.id === d.host ? ' · you' : 'You') : ''}</span></li>`).join('');
-  const ok = [2, 3, 4, 6].includes(n), host = d.host === myId;
+  const host = d.host === myId;
+  $('#lobbyPlayers').innerHTML = d.players.map((p, i) => `<li><span class="mini-chip">${chipHTML(i % teams)}</span>${crestHTML(p.crest, p.color)}<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}</span>${rankHTML(p.wins, true)}<span class="tag">${p.id === d.host ? 'Host' : ''}${p.id === myId ? (p.id === d.host ? ' · you' : 'You') : ''}</span>${host && p.id !== myId ? `<button class="kick${kickArmed === p.id ? ' armed' : ''}" data-kick="${esc(p.id)}" aria-label="Remove ${esc(p.name)} from the table">${kickArmed === p.id ? 'Tap to remove' : 'Remove'}</button>` : ''}</li>`).join('');
+  const ok = [2, 3, 4, 6].includes(n);
+  setSeg('onlineVariant', d.variant === 'power' ? 'power' : 'classic');
+  $('#onlineVariant').querySelectorAll('button').forEach(b => (b.disabled = !host));
   setSeg('onlineRule', d.rule === 'full' ? 'full' : 'race');
   $('#onlineRule').querySelectorAll('button').forEach(b => (b.disabled = !host));
   ruleNote('onlineRule', n);
@@ -972,13 +1044,69 @@ function renderLobby() {
   $('#btnStartOnline').disabled = !ok;
   $('#lobbyHint').textContent = !ok
     ? (n < 2 ? 'Waiting for at least one more player.' : 'Fivefold plays with 2, 3, 4 or 6 players.')
-    : host ? `${n} players · ${teams} teams. Start whenever everyone is in. Games of 10+ moves are ranked.` : 'Waiting for the host to start the game.';
+    : (host ? `${n} players · ${teams} teams. Start whenever everyone is in. Games of 10+ moves are ranked.` : 'Waiting for the host to start the game.') + (d.variant === 'power' ? ' Power Cards: each team is dealt one special card.' : '');
+}
+// ----- host tools: remove players, pick the game type -----
+let kickArmed = null, kickTimer = null;
+const rejoinTried = {};
+async function freshDoc(code) {
+  const { data, error } = await sb.from('games').select('doc').eq('code', code).maybeSingle();
+  if (error || !data) throw error || new Error('not_found');
+  return data.doc;
+}
+async function kickPlayer(id) {
+  const code = onlineCode;
+  if (!sb || !code || !onlineDoc || onlineDoc.host !== myId || id === myId) return;
+  try {
+    const d = await freshDoc(code);
+    if (d.host !== myId) return;
+    if (d.status !== 'lobby') { toast('The game has started. Use Players in the game to give a seat to the computer.'); return; }
+    const who = d.players.find(p => p.id === id);
+    if (!who) { fetchGame(code); return; }
+    const doc = Object.assign({}, d, { players: d.players.filter(p => p.id !== id), kicked: Array.from(new Set((d.kicked || []).concat(id))), updated: Date.now() });
+    const { error } = await sb.from('games').update({ doc, updated_at: new Date().toISOString() }).eq('code', code).eq('status', 'lobby');
+    if (error) throw error;
+    toast(`${who.name} was removed from the table.`);
+  } catch (e) { toast('Could not remove that player. Check your connection and try again.'); }
+  fetchGame(code);
+}
+async function setOnlineVariant(v) {
+  const code = onlineCode; if (!sb || !code) return;
+  v = v === 'power' ? 'power' : 'classic';
+  setSeg('onlineVariant', v);
+  try {
+    const d = await freshDoc(code);
+    if (d.host !== myId || d.status !== 'lobby' || (d.variant || 'classic') === v) { fetchGame(code); return; }
+    const doc = Object.assign({}, d, { variant: v, updated: Date.now() });
+    const { error } = await sb.from('games').update({ doc, updated_at: new Date().toISOString() }).eq('code', code).eq('status', 'lobby');
+    if (error) throw error;
+    store.set('variant', v); setVariant(v);
+  } catch (e) { toast('Could not change the game type. Try again.'); }
+  fetchGame(code);
+}
+// In a running game the host can hand a missing player's seat to the computer.
+function openPlayers() {
+  if (!(mode === 'online' && onlineDoc && onlineDoc.host === myId && G && G.winner === -1)) return;
+  $('#cardBody').innerHTML = `<h2>Players</h2><p class="note">If someone has left, give their seat to the computer so the game can go on. They are taken out of this game.</p>
+    <ul class="mp-list">${G.players.map((p, i) => `<li><span class="mini-chip">${chipHTML(p.team)}</span><span><b>${esc(p.name)}</b>${p.id === myId ? ' (you)' : ''}${p.cpu ? ' · computer' : ''}</span>${p.id !== myId && !p.cpu ? `<button class="btn danger" data-seatkick="${i}">${kickArmed === 'g' + i ? 'Tap to confirm' : 'Give seat to computer'}</button>` : ''}</li>`).join('')}</ul>
+    <button class="btn primary" data-close>Close</button>`;
+  show('#cardModal');
+}
+async function seatToCpu(i) {
+  if (!G || G.winner !== -1 || mode !== 'online') return;
+  const ns = JSON.parse(JSON.stringify(G)), p = ns.players[i];
+  if (!p || p.cpu || p.id === myId) return;
+  ns.players[i] = Object.assign({}, p, { cpu: true, level: 'normal', kicked: true, name: p.name + ' (CPU)' });
+  E.pushLog(ns, { pi: i, kind: 'kick', n: ns.moveNo });
+  ns.moveNo++;
+  await pushState(ns);
 }
 function tableErr(e, code) {
   const m = (e && e.message) || '';
   if (/not_found/.test(m)) return `No table with code ${code || ''}.`.replace(' .', '.');
   if (/started/.test(m)) return 'That game has already started.';
   if (/full/.test(m)) return 'That table is full.';
+  if (/kicked/.test(m)) return 'The host removed you from that table.';
   if (/no_profile/.test(m)) return 'Your profile is missing. Sign out and sign in again.';
   if (/does not exist|schema cache|could not find/i.test(m)) return 'Online tables are not set up yet. Run supabase-setup.sql in Supabase.';
   return 'Could not reach the table. Check your connection and try again.';
@@ -990,7 +1118,7 @@ async function createTable() {
     for (let k = 0; k < 5; k++) {
       const code = genCode();
       const { error } = await sb.rpc('create_game', { p_code: code, p_rule: store.get('rule', 'race') });
-      if (!error) { watchGame(code); return; }
+      if (!error) { watchGame(code); if (variant() === 'power') setOnlineVariant('power'); return; }
       if (error.code !== '23505') { toast(tableErr(error)); return; }
     }
     toast('Could not open a table. Try again.');
@@ -1032,6 +1160,16 @@ function onOnlineDoc(d) {
   // ignore stale copies that arrive after a newer one
   if (onlineDoc && onlineDoc.state && d.state && d.state.gid === onlineDoc.state.gid && d.state.moveNo < onlineDoc.state.moveNo) return;
   if ((d.status === 'lobby' || !d.state) && mode === 'online' && G) return;
+  if (d.status === 'lobby' || !d.state) {
+    const kicked = (d.kicked || []).includes(myId), seated = (d.players || []).some(p => p.id === myId), code = onlineCode;
+    if (kicked || (!seated && rejoinTried[code])) {
+      toast(kicked ? 'The host removed you from this table.' : 'You are no longer seated at this table.');
+      store.set('online', null); leaveOnlineWatch();
+      if (kicked && seated && sb) sb.rpc('leave_game', { p_code: code });
+      selectTab('online'); renderOnlinePanel(); return;
+    }
+    if (!seated && code) { rejoinTried[code] = true; joinTable(code); return; } // our join was lost in a race: sit down again
+  }
   onlineDoc = d;
   if (d.status === 'lobby' || !d.state) {
     if (!$('#game').hidden) showScreen('menu');
@@ -1039,8 +1177,9 @@ function onOnlineDoc(d) {
   }
   const seat = d.state.players.findIndex(p => p.id === myId);
   if (seat < 0) { toast('This game started without you.'); store.set('online', null); leaveOnlineWatch(); renderOnlinePanel(); return; }
+  if (d.state.players[seat].kicked) { toast('The host gave your seat to the computer.'); store.set('online', null); leaveOnlineWatch(); if (mode === 'online') toMenu(); else renderOnlinePanel(); return; }
   if (mode !== 'online' || !G || G.gid !== d.state.gid) {
-    mode = 'online'; cfg = null; viewSeat = seat; handVisible = true; busy = false;
+    mode = 'online'; cfg = null; viewSeat = seat; handVisible = true; busy = false; kickArmed = null;
     hide('#victory'); hide('#handoff');
     if ($('#game').hidden && $('#hall').hidden) showScreen('game');
     G = null; applyState(d.state);
@@ -1057,10 +1196,26 @@ async function saveMove(before, ns) {
   if (!data || !data.length) throw { conflict: true };
   onlineDoc = doc;
 }
-const seatOf = p => ({ id: p.id, name: p.name, crest: p.crest, color: p.color, wins: p.wins });
+const seatOf = p => Object.assign({ id: p.id, name: p.name, crest: p.crest, color: p.color, wins: p.wins }, p.cpu ? { cpu: true, level: p.level || 'normal', kicked: true } : {});
+// Power Cards: read everyone's Table Flipper timer so a team on a timer is never dealt that card.
+async function withFlipTimers(players) {
+  const ids = players.filter(p => !p.cpu).map(p => p.id);
+  let rows = [];
+  try { const { data, error } = await sb.from('profiles').select('id,flip_until').in('id', ids); if (!error && data) rows = data; } catch (e) {}
+  return players.map(p => {
+    const r = rows.find(x => x.id === p.id);
+    let until = r && r.flip_until ? Date.parse(r.flip_until) || 0 : 0;
+    if (p.id === myId && PU) until = Math.max(until, PU.myTimer(myId, null));
+    return until > Date.now() ? Object.assign({}, p, { flipUntil: until }) : p;
+  });
+}
+async function newOnlineState(players, rule, v) {
+  if (v === 'power' && typeof Power !== 'undefined') return Power.create(await withFlipTimers(players), { rule });
+  return E.create(players, { rule });
+}
 async function startOnline() {
   const d = onlineDoc; if (!d || d.host !== myId || ![2, 3, 4, 6].includes(d.players.length)) return;
-  const doc = Object.assign({}, d, { status: 'playing', state: E.create(d.players.map(seatOf), { rule: d.rule }), updated: Date.now() });
+  const doc = Object.assign({}, d, { status: 'playing', state: await newOnlineState(d.players.map(seatOf), d.rule, d.variant), updated: Date.now() });
   const { error } = await sb.from('games').update({ doc, status: 'playing', updated_at: new Date().toISOString() }).eq('code', onlineCode).eq('status', 'lobby');
   if (error) toast(tableErr(error)); else fetchGame(onlineCode);
 }
@@ -1069,8 +1224,8 @@ async function onlineRematch() {
   // refresh everyone's rank badge for the new game
   let players = d.state.players.map(seatOf);
   const { data } = await sb.from('profiles').select('id,display_name,crest,color,wins').in('id', players.map(p => p.id));
-  if (data) players = players.map(p => { const q = data.find(x => x.id === p.id); return q ? { id: p.id, name: q.display_name, crest: q.crest, color: q.color, wins: q.wins } : p; });
-  const doc = Object.assign({}, d, { status: 'playing', state: E.create(players, { rule: d.state.rule }), updated: Date.now() });
+  if (data) players = players.map(p => { const q = !p.cpu && data.find(x => x.id === p.id); return q ? { id: p.id, name: q.display_name, crest: q.crest, color: q.color, wins: q.wins } : p; });
+  const doc = Object.assign({}, d, { status: 'playing', state: await newOnlineState(players, d.state.rule, d.variant || d.state.variant), updated: Date.now() });
   const { error } = await sb.from('games').update({ doc, status: 'playing', updated_at: new Date().toISOString() }).eq('code', onlineCode);
   if (error) toast(tableErr(error)); else fetchGame(onlineCode);
 }
@@ -1084,6 +1239,7 @@ async function leaveLobby() {
 // Online: every player's browser reports the finished game; the database only counts it once.
 function recordOnlineResult() {
   if (!sb || !user || !onlineCode || !G || G.winner === -1) return;
+  if (G.endReason === 'flip') { lastResult = { gid: G.gid, html: '<p class="note">Unranked: a flipped table has no winner.</p>' }; paintResult(); return; }
   const code = onlineCode;
   recordRanked(() => sb.rpc('record_result', { p_code: code }), 'The result could not be saved yet. It will be saved when you open this table again.');
 }
@@ -1093,6 +1249,7 @@ function recordCpuResult() {
   if (!G || G.winner === -1 || recordedGid === G.gid) return;
   const gid = G.gid;
   if (!user) return;
+  if (G.endReason === 'flip') { lastResult = { gid, html: '<p class="note">Unranked: a flipped table has no winner.</p>' }; paintResult(); return; }
   if (!hardOnly(G)) { lastResult = { gid, html: '<p class="note">Practice game. Only wins against <b>Hard</b> computer opponents count towards your rank.</p>' }; paintResult(); return; }
   if (G.endReason === 'ended') { lastResult = { gid, html: '<p class="note">Unranked: games stopped early with End game do not count.</p>' }; paintResult(); return; }
   if (G.moveNo < 10) { lastResult = { gid, html: '<p class="note">Unranked: ranked games need at least 10 moves.</p>' }; paintResult(); return; }
@@ -1145,6 +1302,27 @@ document.querySelector('#menu .tabs').addEventListener('click', e => { const b =
   if (id === 'cpuLevel') cpuRankNote();
   if (id === 'cpuRule' || id === 'localRule') { store.set('rule', b.dataset.v); ruleNote(id, id === 'cpuRule' ? (segVal('cpuMatch') === '3way' ? 3 : 2) : localCount()); }
 }));
+$('#onlineVariant').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.disabled || !onlineDoc || onlineDoc.host !== myId) return;
+  setOnlineVariant(b.dataset.v);
+});
+$('#lobbyPlayers').addEventListener('click', e => {
+  const b = e.target.closest('[data-kick]'); if (!b) return;
+  const id = b.dataset.kick;
+  clearTimeout(kickTimer);
+  if (kickArmed !== id) { kickArmed = id; renderLobby(); kickTimer = setTimeout(() => { kickArmed = null; if (onlineDoc && onlineDoc.status === 'lobby') renderLobby(); }, 3000); return; }
+  kickArmed = null; kickPlayer(id);
+});
+$('#variantPick').addEventListener('click', e => { const b = e.target.closest('.vt'); if (b) { setVariant(b.dataset.v); Sound.tick(); } });
+$('#btnPwRules').onclick = () => PU && PU.openRules();
+$('#btnPwRules2').onclick = () => { hide('#rules'); if (PU) PU.openRules(); };
+$('#btnPlayers').onclick = () => { kickArmed = null; openPlayers(); };
+$('#cardModal').addEventListener('click', e => {
+  const b = e.target.closest('[data-seatkick]'); if (!b) return;
+  const i = +b.dataset.seatkick;
+  if (kickArmed !== 'g' + i) { kickArmed = 'g' + i; openPlayers(); return; }
+  kickArmed = null; hide('#cardModal'); seatToCpu(i);
+});
 $('#onlineRule').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b || b.disabled || !onlineDoc || onlineDoc.host !== myId) return;
   setOnlineRule(b.dataset.v);
@@ -1205,8 +1383,10 @@ $('#btnRestart').onclick = () => {
 $('#hand').addEventListener('click', e => {
   const b = e.target.closest('.hcard'); if (!b || !G) return;
   if (!handVisible) return;
+  if (b.classList.contains('pwh')) { if (PU) { PU.cancel(true); PU.openSheet(); } return; }
   const hi = +b.dataset.hi;
   if (!canActNow()) { peek(hi); return; }
+  if (PU) PU.cancel(true);
   sel = sel && sel.hi === hi ? null : { hi, cell: null };
   Sound.tick();
   clearPeek(); renderBoard(false); renderHand(); renderActions();
@@ -1221,7 +1401,9 @@ function peek(hi) {
 }
 function clearPeek() { cells.forEach(c => c.classList.remove('peek')); }
 grid.addEventListener('click', e => {
-  const c = e.target.closest('.cell'); if (!c || !sel || !canActNow()) return;
+  const c = e.target.closest('.cell'); if (!c) return;
+  if (PU && PU.active()) { PU.onCell(+c.dataset.i); return; }
+  if (!sel || !canActNow()) return;
   const i = +c.dataset.i, card = myHand()[sel.hi];
   if (!card || !E.targets(G, card, myTeam()).includes(i)) return;
   if (sel.cell === i) { commit(); return; }
@@ -1242,7 +1424,7 @@ $('#actions').addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     const open = ['#rules', '#editProf', '#cardModal'].find(id => !$(id).hidden);
-    if (open) hide(open); else if (sel) { sel = null; renderBoard(false); renderHand(); renderActions(); }
+    if (open) hide(open); else if (PU && PU.active()) PU.cancel(); else if (sel) { sel = null; renderBoard(false); renderHand(); renderActions(); }
   }
   if (e.key === 'Enter' && sel && sel.cell != null && !(e.target.closest && e.target.closest('input'))) commit();
 });
@@ -1287,14 +1469,21 @@ $('#btnEnd').onclick = async () => {
   clearTimeout(endArmed); endArmed = null; b.textContent = 'End game';
   clearTimeout(cpuTimer);
   sel = null;
-  await pushState(E.endNow(G, viewSeat));
+  await pushState(R(G).endNow(G, viewSeat));
 };
 
 
 /* ---------------- boot ---------------- */
+if (PU) PU.init({
+  get G() { return G; }, get seat() { return viewSeat; }, get mode() { return mode; }, get visible() { return handVisible; },
+  canAct: () => canActNow(), push: (ns, quiet) => pushState(ns, quiet), rerender: () => { if (G) renderAll(false); },
+  clearSel: () => { sel = null; clearPeek(); }, cells: () => cells, chipHTML, teamName, toast, Sound, FX,
+  myId: () => myId, sb: () => sb
+});
 buildBoard();
 setSkin(skin);
 renderLocalNames();
+setVariant(store.get('variant', 'classic'));
 ['cpuRule', 'localRule'].forEach(id => setSeg(id, store.get('rule', 'race')));
 ruleNote('cpuRule', 2); ruleNote('localRule', localCount());
 $('#rulesLadder').innerHTML = ladderItems(null);
